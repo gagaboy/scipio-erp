@@ -718,7 +718,9 @@ under the License.
     <screen name="CommonTaxAuthorityDecorator">
         <section>
             <actions>
-                <set field="activeSubMenuItem" value="TaxAuthorities"/>
+                <!-- SCIPIO: now has own sub-menu 
+                <set field="activeSubMenuItem" value="TaxAuthorities"/>-->
+                <set field="activeSubMenu" value="TaxAuthority"/>
                 <set field="taxAuthPartyId" from-field="parameters.taxAuthPartyId"/>
                 <set field="taxAuthGeoId" from-field="parameters.taxAuthGeoId"/>
                 <entity-one entity-name="TaxAuthority" value-field="taxAuthority"/>
@@ -729,6 +731,17 @@ under the License.
             </actions>
             <widgets>
                 <decorator-screen name="CommonSettingsDecorator" location="${parameters.mainDecoratorLocation}">
+                    <decorator-section name="body">
+                        <section>
+                            <condition>
+                                <not><if-empty field="taxAuthority"/></not>
+                            </condition>
+                            <widgets>
+                                <label style="heading+2">${uiLabelMap.CommonFor}: ${taxAuthPartyName.firstName} ${taxAuthPartyName.middleName} ${taxAuthPartyName.lastName} ${taxAuthPartyName.groupName} [${taxAuthority.taxAuthPartyId}] / ${taxAuthGeo.geoName} [${taxAuthority.taxAuthGeoId}]</label>
+                            </widgets>
+                        </section>
+                        <decorator-section-include name="body"/>
+                    </decorator-section>
                 </decorator-screen>
             </widgets>
         </section>

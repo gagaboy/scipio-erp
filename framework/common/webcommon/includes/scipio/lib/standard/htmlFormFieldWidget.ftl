@@ -515,7 +515,7 @@ NOTE (2016-08-30): The special token values {{{_EMPTY_VALUE_}}} and {{{_NO_VALUE
   "otherValue":"", "otherFieldSize":"", "dDFCurrent":"", "defaultValue":"", "ajaxOptions":"", "frequency":"", "minChars":"",
   "choices":"", "autoSelect":"", "partialSearch":"", "partialChars":"", "ignoreCase":"", "fullSearch":"", "events":{}, 
   "ajaxEnabled":false, "title":"", "tooltip":"", "description":"", "manualItems":false, "manualItemsOnly":false, "collapse":false, 
-  "fieldTitleBlank":false, "inlineSelected":true, "disabled":false, "required":false, "asmSelectArgs":{}, "inlineLabel":false, "passArgs":{}
+  "fieldTitleBlank":false, "inlineSelected":true, "disabled":false, "required":false, "dynSelectArgs":{}, "asmSelectArgs":false, "inlineLabel":false, "passArgs":{}
 }>
 <#macro field_select_widget args={} inlineArgs...>
   <#local args = mergeArgMaps(args, inlineArgs, scipioStdTmplLib.field_select_widget_defaultArgs)>
@@ -569,11 +569,14 @@ NOTE (2016-08-30): The special token values {{{_EMPTY_VALUE_}}} and {{{_NO_VALUE
       </#list>
     </#if>
   </#if>
+  <#if !asmSelectArgs?is_boolean>
+    <#local dynSelectArgs = asmSelectArgs>
+  </#if>
   <@field_select_markup_widget name=name class=class alert=alert id=id style=style multiple=multiple formName=formName formId=formId otherFieldName=otherFieldName size=size currentFirst=currentFirst 
     currentValue=currentValue currentDescription=currentDescription allowEmpty=allowEmpty options=options fieldName=fieldName otherFieldName=otherFieldName otherValue=otherValue otherFieldSize=otherFieldSize 
     dDFCurrent=dDFCurrent defaultValue=defaultValue ajaxOptions=ajaxOptions frequency=frequency minChars=minChars choices=choices autoSelect=autoSelect partialSearch=partialSearch partialChars=partialChars 
     ignoreCase=ignoreCase fullSearch=fullSearch events=events ajaxEnabled=ajaxEnabled title=title tooltip=tooltip description=description manualItems=manualItems manualItemsOnly=manualItemsOnly 
-    collapse=collapse fieldTitleBlank=fieldTitleBlank inlineSelected=inlineSelected asmSelectArgs=asmSelectArgs inlineLabel=inlineLabel disabled=disabled required=required origArgs=origArgs passArgs=passArgs><#nested></@field_select_markup_widget>
+    collapse=collapse fieldTitleBlank=fieldTitleBlank inlineSelected=inlineSelected dynSelectArgs=dynSelectArgs asmSelectArgs=dynSelectArgs inlineLabel=inlineLabel disabled=disabled required=required origArgs=origArgs passArgs=passArgs><#nested></@field_select_markup_widget>
 </#macro>
 
 <#-- field markup - theme override -->
@@ -581,7 +584,7 @@ NOTE (2016-08-30): The special token values {{{_EMPTY_VALUE_}}} and {{{_NO_VALUE
     currentValue="" currentDescription="" allowEmpty=true options="" fieldName="" otherFieldName="" otherValue="" otherFieldSize="" 
     dDFCurrent="" defaultValue="" ajaxOptions="" frequency="" minChars="" choices="" autoSelect="" partialSearch="" partialChars="" 
     ignoreCase="" fullSearch="" events={} ajaxEnabled=false title="" tooltip="" description="" manualItems=false manualItemsOnly=false 
-    collapse=false fieldTitleBlank=false inlineSelected=true disabled=false asmSelectArgs={} inlineLabel=false required=false origArgs={} passArgs={} catchArgs...>
+    collapse=false fieldTitleBlank=false inlineSelected=true disabled=false dynSelectArgs={} inlineLabel=false required=false origArgs={} passArgs={} catchArgs...>
   <#local attribs = {}>
   <#local class = addClassArg(class, styles.field_select_default!"")>
   <#if tooltip?has_content>
@@ -646,20 +649,20 @@ NOTE (2016-08-30): The special token values {{{_EMPTY_VALUE_}}} and {{{_NO_VALUE
       });
     </@script>
   </#if>
-  <#if asmSelectArgs?has_content>
-    <#local asmtitle = asmSelectArgs.title!"">
-    <#if !asmtitle?has_content>
+  <#if dynSelectArgs?has_content>
+    <#local dyntitle = dynSelectArgs.title!"">
+    <#if !dyntitle?has_content>
       <#if title?has_content>
-        <#local asmtitle = title>
+        <#local dyntitle = title>
       <#elseif description?has_content>
-        <#local asmtitle = description>
+        <#local dyntitle = description>
       <#elseif tooltip?has_content>
-        <#local asmtitle = tooltip>
+        <#local dyntitle = tooltip>
       <#else>
-        <#local asmtitle = ""> <#-- otherwise will show 'undefined' -->
+        <#local dyntitle = ""> <#-- otherwise will show 'undefined' -->
       </#if>
     </#if>
-    <@asmSelectScript id=id formName=formName formId=formId title=asmtitle args=asmSelectArgs passArgs=passArgs/>
+    <@dynamicSelectFieldScript id=id formName=formName formId=formId title=dyntitle args=dynSelectArgs passArgs=passArgs/>
   </#if>
 </#macro>
 
@@ -846,7 +849,7 @@ NOTE (2016-08-30): The special token values {{{_EMPTY_VALUE_}}} and {{{_NO_VALUE
 <#assign field_checkbox_widget_defaultArgs = {
   "items":[], "id":"", "class":"", "style":"", "alert":"", "allChecked":"", "currentValue":"", "defaultValue":"", "name":"", "events":{}, 
   "tooltip":"", "title":"", "fieldTitleBlank":false, "multiMode":true, "inlineItems":"", "inlineLabel":false, "type":"", 
-  "value":"", "altValue":"", "useHidden":"", "required":false, 
+  "value":"", "altValue":false, "useHidden":"", "required":false, 
   "readonly":"", "disabled":"", "passArgs":{}
 }>
 <#macro field_checkbox_widget args={} inlineArgs...>
@@ -902,7 +905,7 @@ NOTE (2016-08-30): The special token values {{{_EMPTY_VALUE_}}} and {{{_NO_VALUE
     currentValue=currentValue defaultValue=defaultValue name=name events=events tooltip=tooltip title=title multiMode=multiMode 
     fieldTitleBlank=fieldTitleBlank inlineItems=inlineItems inlineLabel=inlineLabel type=type stylesPrefix=stylesPrefix
     labelType=labelType labelPosition=labelPosition readonly=readonly disabled=disabled
-    value=value altValue=altValue required=required origArgs=origArgs passArgs=passArgs><#nested></@field_checkbox_markup_widget>
+    value=value altValue=altValue useHidden=useHidden required=required origArgs=origArgs passArgs=passArgs><#nested></@field_checkbox_markup_widget>
 </#macro>
 
 <#-- field markup - theme override 
@@ -911,7 +914,7 @@ NOTE (2016-08-30): The special token values {{{_EMPTY_VALUE_}}} and {{{_NO_VALUE
      NOTE: "value", "altValue" and "useHidden" are only fallbacks/common/defaults; the ones in items maps have priority -->
 <#macro field_checkbox_markup_widget items=[] id="" class="" style="" alert="" allChecked="" currentValue=[] defaultValue=[] name="" 
     events={} tooltip="" title="" fieldTitleBlank=false multiMode=true inlineItems="" inlineLabel=false type="default" stylesPrefix=""
-    labelType="standard" labelPosition="after" readonly="" disabled="" value="" altValue="" useHidden="" required=false origArgs={} passArgs={} catchArgs...>
+    labelType="standard" labelPosition="after" readonly="" disabled="" value="" altValue=false useHidden="" required=false origArgs={} passArgs={} catchArgs...>
   <#if !inlineItems?is_boolean>
     <#local inlineItems = true>
   </#if>
@@ -943,13 +946,13 @@ NOTE (2016-08-30): The special token values {{{_EMPTY_VALUE_}}} and {{{_NO_VALUE
   <#local currentId = id>
   <#list items as item>
     <#local inputAttribs = {}>
-    <#local itemValue = item.value!value!"">
-    <#local itemAltValue = item.altValue!altValue!false>
-    <#if !itemAltValue?is_boolean || (itemAltValue?is_boolean && itemAltValue == true)>
-      <#local itemUseHidden = true>
-    <#else>
-      <#local itemUseHidden = item.useHidden!useHidden!false>
-      <#if !itemUseHidden?is_boolean>
+    <#local itemValue = item.value!value>
+    <#local itemAltValue = item.altValue!altValue>
+    <#local itemUseHidden = item.useHidden!useHidden>
+    <#if !itemUseHidden?is_boolean>
+      <#if !itemAltValue?is_boolean || (itemAltValue?is_boolean && itemAltValue == true)>
+        <#local itemUseHidden = true>
+      <#else>
         <#local itemUseHidden = false>
       </#if>
     </#if>
@@ -1372,7 +1375,8 @@ NOTE (2016-08-30): The special token values {{{_EMPTY_VALUE_}}} and {{{_NO_VALUE
           <#local text = getTextLabelFromExpr(styles.field_submit_default_text!"")>
         </#if>
         <#-- SCIPIO: NOTE: IMPORTANT: 2016-11-03: javascript:document[formName] in the href here MUST be
-            passed through jQuery() - otherwise jQuery.validate is not triggered, and text-link everywhere will fail to trigger validation  -->
+            passed through jQuery() - otherwise jQuery.validate is not triggered, and text-link everywhere will fail to trigger validation 
+            IN ADDITION, must include void(0) afterward to prevent false click -->
         <a<@fieldClassAttribStr class=class alert=alert /> <#rt>
           href="<#if (href?string == "false")>javascript:void(0)<#elseif href?has_content>${escapeFullUrl(href, 'html')}<#elseif formName?has_content>javascript:jQuery(document['${escapeVal(formName, 'js-html')}']).submit();void(0)<#else>javascript:void(0)</#if>"<#t/>
           <#if disabled> disabled="disabled"<#else><#if events?has_content><@commonElemEventAttribStr events=events /><#elseif confirmation?has_content> onclick="return confirm('${escapeVal(confirmation, 'js-html')}');"</#if></#if><#t/>

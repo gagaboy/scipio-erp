@@ -4743,6 +4743,9 @@
         <value xml:lang="zh_TW">修改信用卡</value>
     </property>
     <property key="AccountingEditCustomTimePeriods">
+        <value xml:lang="en">Custom Time Periods</value>
+    </property>
+    <property key="AccountingEditCustomTimePeriods">
         <value xml:lang="de">Individuelle Zeiträume bearbeiten</value>
         <value xml:lang="en">Edit Custom Time Periods</value>
         <value xml:lang="fr">Modifier les périodes de temps</value>
@@ -22451,5 +22454,11 @@
     <property key="AccountingDebtor">
         <value xml:lang="de">Debitor</value>
         <value xml:lang="en">Debtor</value>
+    </property>
+    <property key="PageTitleNewTaxAuthorityPartyInfo">
+        <value xml:lang="de">Neue Informationen der Steuerbehörde</value>
+        <value xml:lang="en">New Tax Authority Party Info</value>
+        <value xml:lang="es">Editar Info de Grupo de Autoridad Fiscal</value>
+        <value xml:lang="fr">Ajouter informations d'une administration fiscale</value>
     </property>
 </resource>
