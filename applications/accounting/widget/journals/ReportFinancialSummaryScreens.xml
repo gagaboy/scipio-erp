@@ -37,7 +37,7 @@ under the License.
                         <screenlet title="${uiLabelMap.PageTitleSalesInvoiceByProductCategorySummary}">
                             <include-form name="SalesInvoiceByProductCategorySummaryOptions" location="component://accounting/widget/journals/ReportFinancialSummaryForms.xml"/>
                         </screenlet>
-                        <screenlet title="${uiLabelMap.PageTitleSalesInvoiceByProductGlAccountSummary}">
+                        <screenlet>
                             <include-form name="SalesInvoiceByProductGlAccountSummaryOptions" location="component://accounting/widget/journals/ReportFinancialSummaryForms.xml"/>
                         </screenlet>
                         <screenlet title="${uiLabelMap.PageTitlePaymentByMethodSummary}">
@@ -73,132 +73,119 @@ under the License.
 
     <screen name="SalesInvoiceByProductCategorySummary">
         <section>
+            <actions>
+                <include-screen-actions name="FinancialSummaryDataPrep"/>
+
+                <set field="titleProperty" value="PageTitleSalesInvoiceByProductCategorySummary"/>
+
+                <set field="rootProductCategoryId" from-field="parameters.rootProductCategoryId"/>
+                <entity-one entity-name="ProductCategory" value-field="rootProductCategory" auto-field-map="false" use-cache="true">
+                    <field-map field-name="productCategoryId" from-field="rootProductCategoryId"/>
+                </entity-one>
+
+                <script location="component://accounting/webapp/accounting/WEB-INF/actions/reports/SalesInvoiceByProductCategorySummary.groovy"/>
+                
+                <set field="activeSubMenuItem" value="SalesInvoiceByProductCategorySummary"/>
+            </actions>
             <widgets>
-                <include-screen name="FinancialSummaryDataPrep" share-scope="true"/>
-                <section>
-                    <actions>
-                        <set field="titleProperty" value="PageTitleSalesInvoiceByProductCategorySummary"/>
-
-                        <set field="rootProductCategoryId" from-field="parameters.rootProductCategoryId"/>
-                        <entity-one entity-name="ProductCategory" value-field="rootProductCategory" auto-field-map="false" use-cache="true">
-                            <field-map field-name="productCategoryId" from-field="rootProductCategoryId"/>
-                        </entity-one>
-
-                        <script location="component://accounting/webapp/accounting/WEB-INF/actions/reports/SalesInvoiceByProductCategorySummary.groovy"/>
-                    </actions>
-                    <widgets>
-                        <decorator-screen name="CommonPartyDecorator" location="${parameters.mainDecoratorLocation}">
-                            <decorator-section name="body">
-                                <screenlet>
-                                    <platform-specific>
-                                        <html><html-template location="component://accounting/webapp/accounting/reports/SalesInvoiceByProductCategorySummary.ftl"/></html>
-                                    </platform-specific>
-                                </screenlet>
-                            </decorator-section>
-                        </decorator-screen>
-                    </widgets>
-                </section>
+                <decorator-screen name="CommonPartyDecorator" location="${parameters.mainDecoratorLocation}">
+                    <decorator-section name="body">
+                        <screenlet>
+                            <platform-specific>
+                                <html><html-template location="component://accounting/webapp/accounting/reports/SalesInvoiceByProductCategorySummary.ftl"/></html>
+                            </platform-specific>
+                        </screenlet>
+                    </decorator-section>
+                </decorator-screen>
             </widgets>
         </section>
     </screen>
     <screen name="SalesInvoiceByProductGlAccountSummary">
         <section>
-            <widgets>
-                <include-screen name="FinancialSummaryDataPrep" share-scope="true"/>
-                <section>
-                    <actions>
-                        <set field="titleProperty" value="PageTitleSalesInvoiceByProductGlAccountSummary"/>
+            <actions>
+                <include-screen-actions name="FinancialSummaryDataPrep"/>
+                
+                <set field="titleProperty" value="PageTitleSalesInvoiceByProductGlAccountSummary"/>
 
-                        <script location="component://accounting/webapp/accounting/WEB-INF/actions/reports/SalesInvoiceByProductGlAccountSummary.bsh"/>
-                    </actions>
-                    <widgets>
-                        <decorator-screen name="CommonPartyDecorator" location="${parameters.mainDecoratorLocation}">
-                            <decorator-section name="body">
-                                <screenlet>
-                                    <platform-specific>
-                                        <html><html-template location="component://accounting/webapp/accounting/reports/SalesInvoiceByProductGlAccountSummary.ftl"/></html>
-                                    </platform-specific>
-                                </screenlet>
-                            </decorator-section>
-                        </decorator-screen>
-                    </widgets>
-                </section>
+                <script location="component://accounting/webapp/accounting/WEB-INF/actions/reports/SalesInvoiceByProductGlAccountSummary.bsh"/>
+            </actions>
+            <widgets>
+                <decorator-screen name="CommonPartyDecorator" location="${parameters.mainDecoratorLocation}">
+                    <decorator-section name="body">
+                        <screenlet>
+                            <platform-specific>
+                                <html><html-template location="component://accounting/webapp/accounting/reports/SalesInvoiceByProductGlAccountSummary.ftl"/></html>
+                            </platform-specific>
+                        </screenlet>
+                    </decorator-section>
+                </decorator-screen>
             </widgets>
         </section>
     </screen>
 
     <screen name="PaymentByMethodSummary">
         <section>
-            <widgets>
-                <include-screen name="FinancialSummaryDataPrep" share-scope="true"/>
-                <section>
-                    <actions>
-                        <set field="titleProperty" value="PageTitlePaymentByMethodSummary"/>
+            <actions>
+                <include-screen-actions name="FinancialSummaryDataPrep"/>
+            
+                <set field="titleProperty" value="PageTitlePaymentByMethodSummary"/>
 
-                        <script location="component://accounting/webapp/accounting/WEB-INF/actions/reports/PaymentByMethodSummary.bsh"/>
-                    </actions>
-                    <widgets>
-                        <decorator-screen name="CommonPartyDecorator" location="${parameters.mainDecoratorLocation}">
-                            <decorator-section name="body">
-                                <screenlet>
-                                    <platform-specific>
-                                        <html><html-template location="component://accounting/webapp/accounting/reports/PaymentByMethodSummary.ftl"/></html>
-                                    </platform-specific>
-                                </screenlet>
-                            </decorator-section>
-                        </decorator-screen>
-                    </widgets>
-                </section>
+                <script location="component://accounting/webapp/accounting/WEB-INF/actions/reports/PaymentByMethodSummary.bsh"/>
+            </actions>
+            <widgets>
+                <decorator-screen name="CommonPartyDecorator" location="${parameters.mainDecoratorLocation}">
+                    <decorator-section name="body">
+                        <screenlet>
+                            <platform-specific>
+                                <html><html-template location="component://accounting/webapp/accounting/reports/PaymentByMethodSummary.ftl"/></html>
+                            </platform-specific>
+                        </screenlet>
+                    </decorator-section>
+                </decorator-screen>
             </widgets>
         </section>
     </screen>
     <screen name="InventoryIssueSummary">
         <section>
-            <widgets>
-                <include-screen name="FinancialSummaryDataPrep" share-scope="true"/>
-                <section>
-                    <actions>
-                        <set field="titleProperty" value="PageTitleInventoryIssueSummary"/>
+            <actions>
+                <include-screen-actions name="FinancialSummaryDataPrep"/>
+            
+                <set field="titleProperty" value="PageTitleInventoryIssueSummary"/>
 
-                        <script location="component://accounting/webapp/accounting/WEB-INF/actions/reports/InventoryIssueSummary.bsh"/>
-                    </actions>
-                    <widgets>
-                        <decorator-screen name="CommonPartyDecorator" location="${parameters.mainDecoratorLocation}">
-                            <decorator-section name="body">
-                                <screenlet>
-                                    <platform-specific>
-                                        <html><html-template location="component://accounting/webapp/accounting/reports/InventoryIssueSummary.ftl"/></html>
-                                    </platform-specific>
-                                </screenlet>
-                            </decorator-section>
-                        </decorator-screen>
-                    </widgets>
-                </section>
+                <script location="component://accounting/webapp/accounting/WEB-INF/actions/reports/InventoryIssueSummary.bsh"/>
+            </actions>
+            <widgets>
+                <decorator-screen name="CommonPartyDecorator" location="${parameters.mainDecoratorLocation}">
+                    <decorator-section name="body">
+                        <screenlet>
+                            <platform-specific>
+                                <html><html-template location="component://accounting/webapp/accounting/reports/InventoryIssueSummary.ftl"/></html>
+                            </platform-specific>
+                        </screenlet>
+                    </decorator-section>
+                </decorator-screen>
             </widgets>
         </section>
     </screen>
     <screen name="FinancialAccountSummary">
         <section>
-            <widgets>
-                <include-screen name="FinancialSummaryDataPrep" share-scope="true"/>
-                <section>
-                    <actions>
-                        <set field="titleProperty" value="PageTitleFinancialAccountSummary"/>
+            <actions>
+                <include-screen-actions name="FinancialSummaryDataPrep"/>
+            
+                <set field="titleProperty" value="PageTitleFinancialAccountSummary"/>
 
-                        <script location="component://accounting/webapp/accounting/WEB-INF/actions/reports/FinancialAccountSummary.bsh"/>
-                    </actions>
-                    <widgets>
-                        <decorator-screen name="CommonPartyDecorator" location="${parameters.mainDecoratorLocation}">
-                            <decorator-section name="body">
-                                <screenlet>
-                                    <platform-specific>
-                                        <html><html-template location="component://accounting/webapp/accounting/reports/FinancialAccountSummary.ftl"/></html>
-                                    </platform-specific>
-                                </screenlet>
-                            </decorator-section>
-                        </decorator-screen>
-                    </widgets>
-                </section>
+                <script location="component://accounting/webapp/accounting/WEB-INF/actions/reports/FinancialAccountSummary.bsh"/>
+            </actions>
+            <widgets>
+                <decorator-screen name="CommonPartyDecorator" location="${parameters.mainDecoratorLocation}">
+                    <decorator-section name="body">
+                        <screenlet>
+                            <platform-specific>
+                                <html><html-template location="component://accounting/webapp/accounting/reports/FinancialAccountSummary.ftl"/></html>
+                            </platform-specific>
+                        </screenlet>
+                    </decorator-section>
+                </decorator-screen>
             </widgets>
         </section>
     </screen>
@@ -337,7 +324,7 @@ under the License.
             <widgets>
                 <decorator-screen name="CommonOrganizationAccountingReportsDecorator" location="${parameters.mainDecoratorLocation}">
                     <decorator-section name="body">
-                        <screenlet title="${uiLabelMap.AccountingBalanceSheet}">
+                        <screenlet>
                             <include-form name="BalanceSheetParameters" location="component://accounting/widget/journals/ReportFinancialSummaryForms.xml"/>
                         </screenlet>
                         <link text="${uiLabelMap.AccountingExportAsCsv}" style="${styles.link_run_sys} ${styles.action_export}" target="BalanceSheet.csv">
@@ -350,7 +337,7 @@ under the License.
                             <parameter param-name="thruDate" from-field="parameters.thruDate"/>
                             <parameter param-name="glFiscalTypeId" from-field="glFiscalTypeId"/>
                         </link>
-                        <screenlet title="${uiLabelMap.AccountingBalanceSheet}">
+                        <screenlet>
                             <label text="${uiLabelMap.AccountingAssets}"/>
                             <include-form name="BalanceSheetAssets" location="component://accounting/widget/journals/ReportFinancialSummaryForms.xml"/>
                             <label text="${uiLabelMap.AccountingLiabilities}"/>
@@ -479,7 +466,7 @@ under the License.
             <widgets>
                 <decorator-screen name="CommonOrganizationAccountingReportsDecorator" location="${parameters.mainDecoratorLocation}">
                     <decorator-section name="body">
-                        <screenlet title="${uiLabelMap.AccountingComparativeBalanceSheet}">
+                        <screenlet>
                             <include-form name="ComparativeBalanceSheetParameters" location="component://accounting/widget/journals/ReportFinancialSummaryForms.xml"/>
                         </screenlet>
                         <link text="${uiLabelMap.AccountingExportAsCsv}" style="${styles.link_run_sys} ${styles.action_export}" target="ComparativeBalanceSheet.csv">
@@ -496,7 +483,7 @@ under the License.
                             <parameter param-name="period2ThruDate"/>
                             <parameter param-name="period2GlFiscalTypeId" from-field="period2GlFiscalTypeId"/>
                         </link>
-                        <screenlet title="${uiLabelMap.AccountingComparativeBalanceSheet}">
+                        <screenlet>
                             <label text="${uiLabelMap.AccountingAssets}"/>
                             <include-form name="ComparativeBalanceSheetAssets" location="component://accounting/widget/journals/ReportFinancialSummaryForms.xml"/>
                             <label text="${uiLabelMap.AccountingLiabilities}"/>
@@ -673,7 +660,7 @@ under the License.
             <widgets>
                 <decorator-screen name="CommonOrganizationAccountingReportsDecorator" location="${parameters.mainDecoratorLocation}">
                     <decorator-section name="body">
-                        <screenlet title="${uiLabelMap.AccountingTransactionTotals}">
+                        <screenlet>
                             <include-form name="TransactionSelectionForm" location="component://accounting/widget/journals/ReportFinancialSummaryForms.xml"/>
                         </screenlet>
                         <section>
@@ -805,10 +792,10 @@ under the License.
             <widgets>
                 <decorator-screen name="CommonOrganizationAccountingReportsDecorator" location="${parameters.mainDecoratorLocation}">
                     <decorator-section name="body">
-                        <screenlet title="${uiLabelMap.AccountingIncomeStatement}">
+                        <screenlet>
                             <include-form name="TransactionSelectionForm" location="component://accounting/widget/journals/ReportFinancialSummaryForms.xml"/>
                         </screenlet>
-                        <screenlet title="${uiLabelMap.AccountingIncomeStatement}">
+                        <screenlet>
                             <link text="${uiLabelMap.AccountingExportAsCsv}" style="${styles.link_run_sys} ${styles.action_export}" target="IncomeStatementListCsv.csv">
                                 <parameter param-name="fromDate" from-field="fromDate"/>
                                 <parameter param-name="thruDate" from-field="thruDate"/>
@@ -954,10 +941,10 @@ under the License.
             <widgets>
                 <decorator-screen name="CommonOrganizationAccountingReportsDecorator" location="${parameters.mainDecoratorLocation}">
                     <decorator-section name="body">
-                        <screenlet title="${uiLabelMap.AccountingComparativeIncomeStatement}">
+                        <screenlet>
                             <include-form name="ComparativeIncomeStatementParameters" location="component://accounting/widget/journals/ReportFinancialSummaryForms.xml"/>
                         </screenlet>
-                        <screenlet title="${uiLabelMap.AccountingComparativeIncomeStatement}">
+                        <screenlet >
                             <link text="${uiLabelMap.AccountingExportAsCsv}" style="${styles.link_run_sys} ${styles.action_export}" target="ComparativeIncomeStatements.csv">
                                 <parameter param-name="period1FromDate" from-field="period1FromDate"/>
                                 <parameter param-name="period1ThruDate" from-field="period1ThruDate"/>
@@ -1398,10 +1385,10 @@ under the License.
             <widgets>
                 <decorator-screen name="CommonOrganizationAccountingReportsDecorator" location="${parameters.mainDecoratorLocation}">
                     <decorator-section name="body">
-                        <screenlet title="${uiLabelMap.AccountingCashFlowStatement}">
+                        <screenlet>
                             <include-form name="CashFlowStatementParameters" location="component://accounting/widget/journals/ReportFinancialSummaryForms.xml"/>
                         </screenlet>
-                        <screenlet title="${uiLabelMap.AccountingCashFlowStatement}">
+                        <screenlet>
                             <link text="${uiLabelMap.AccountingExportAsCsv}" style="${styles.link_run_sys} ${styles.action_export}" target="CashFlowStatementListCsv.csv">
                                 <parameter param-name="fromDate" from-field="fromDate"/>
                                 <parameter param-name="thruDate" from-field="thruDate"/>
@@ -1528,10 +1515,10 @@ under the License.
             <widgets>
                 <decorator-screen name="CommonOrganizationAccountingReportsDecorator" location="${parameters.mainDecoratorLocation}">
                     <decorator-section name="body">
-                        <screenlet title="${uiLabelMap.AccountingComparativeCashFlowStatement}">
+                        <screenlet>
                             <include-form name="ComparativeCashFlowStatementParameters" location="component://accounting/widget/journals/ReportFinancialSummaryForms.xml"/>
                         </screenlet>
-                        <screenlet title="${uiLabelMap.AccountingComparativeCashFlowStatement}">
+                        <screenlet>
                             <link text="${uiLabelMap.AccountingExportAsCsv}" style="${styles.link_run_sys} ${styles.action_export}" target="ComparativeCashFlowStatement.csv">
                                 <parameter param-name="period1FromDate" from-field="period1FromDate"/>
                                 <parameter param-name="period1ThruDate" from-field="period1ThruDate"/>
