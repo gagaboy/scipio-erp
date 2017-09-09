@@ -39,6 +39,7 @@ import org.ofbiz.service.ServiceUtil;
 import org.ofbiz.product.catalog.*;
 import org.ofbiz.product.feature.*;
 import org.ofbiz.product.product.*;
+import org.ofbiz.product.store.*;
 import org.ofbiz.product.product.ProductSearchSession.ProductSearchOptions;
 import org.ofbiz.product.product.ProductSearch.CategoryConstraint;
 import org.ofbiz.product.product.ProductSearch.FeatureConstraint;
@@ -51,7 +52,7 @@ import org.ofbiz.product.product.ProductSearch.SortProductField;
 import org.ofbiz.product.product.ProductSearch.SortProductPrice;
 import org.ofbiz.product.product.ProductSearch.SortProductFeature;
 import org.ofbiz.product.category.CategoryWorker;
-import com.ilscipio.solr.SolrUtil;
+import com.ilscipio.solr.*;
 
 // SCIPIO: NOTE: This script is responsible for checking whether solr is applicable (if no check, implies the shop assumes solr is always enabled).
 final String module = "KeywordSearch.groovy";
@@ -60,8 +61,13 @@ final boolean DEBUG = Debug.verboseOn();
 final boolean useSolr = ("Y" == EntityUtilProperties.getPropertyValue("shop", "shop.useSolr", "Y", delegator)); // (TODO?: in theory this should be a ProductStore flag)
 
 errorOccurred = false;
-kwsArgs = [:];
-ProductSearchOptions kwsParams = null;
+
+// NOTE: 2017-08-28: The script params are MOVED to a kwsArgs sub-map which caller must create/specify, 
+// because they clash with the output results. These inputs were all added by Scipio and they weren't used anywhere (at time of writing)...
+// See further below for possible values...
+kwsArgs = context.kwsArgs ? new HashMap(context.kwsArgs) : new HashMap();
+
+ProductSearchOptions kwsParams = context.kwsParams; // these usually come from the http request
 
 handleException = { e ->
     // FIXME?: no clean way at the moment to identify when error is user input or system/code error;
@@ -88,7 +94,7 @@ context.remove("localVarsOnly");
 //defaultNoConditionFind = EntityUtilProperties.getPropertyValue("widget", "widget.defaultNoConditionFind", delegator);
 defaultNoConditionFind = EntityUtilProperties.getPropertyValue("shop", "shop.search.defaultNoConditionFind", "Y", delegator);
 
-noConditionFind = context.noConditionFind;
+noConditionFind = kwsArgs.noConditionFind != null ? kwsArgs.noConditionFind : context.noConditionFind;
 if (!localVarsOnly) {
     if (!noConditionFind) {
         noConditionFind = parameters.noConditionFind ? parameters.noConditionFind.toString() : null;
@@ -137,14 +143,12 @@ if (context.useSolr == false || useSolr == false) {
 }
 
 nowTimestamp = context.nowTimestamp ?: UtilDateTime.nowTimestamp();
+productStore = context.productStore ?: ProductStoreWorker.getProductStore(request);
+locale = context.locale;
 
 sanitizeUserQueryExpr = { expr ->
-    // TODO: this is extremely limited at the moment, only supports full solr syntax or exact string
-    // FIXME: we can't use SolrUtil.escapeTermPlain due to issue with backslash-whitespace interpret
     if (expr instanceof String) {
-        if (!expr) return expr;
-        if (kwsArgs.searchSyntax == "full") return expr;
-        else return SolrUtil.escapeTermFull(expr)
+        return SolrExprUtil.preparseUserQuery(expr, kwsArgs.searchSyntax);
     } else if (expr instanceof List) {
         if (!expr) return expr;
         def resExprList = [];
@@ -156,33 +160,39 @@ sanitizeUserQueryExpr = { expr ->
 };
 
 // WARN: this one may add quotes (decision delegated)
-escapeTerm = { term -> return SolrUtil.escapeTermFull(term); };
+escapeTerm = { term -> return SolrExprUtil.escapeTermFull(term); };
 
 try {
-    // allow full solr syntax in input search strings? (if false, searches exact string only)
-    // PROBLEM: by allowing full query, user can easily cause crash - it's caught, but is unfriendly.
-    // TODO?: should support an in-between pre-parsing, for user friendly and potential security reasons.
-    kwsArgs.searchSyntax = context.searchSyntax != null ? context.searchSyntax : "full";
-    kwsArgs.searchString = sanitizeUserQueryExpr(context.searchString); // WARN: setting this here overrides ALL the parameters.SEARCH_STRINGx expressions
-    kwsArgs.searchFilters = context.searchFilters ?: []; // list
-    kwsArgs.searchFilter = context.searchFilter; // string or list; if string, it's split on whitespace to make list
-    kwsArgs.excludeVariants = context.searchExcludeVariants; // NOTE: should usually not specify this; is a ProductStore field
-    kwsArgs.viewSize = context.viewSize;
-    kwsArgs.viewIndex = context.viewIndex;
-    kwsArgs.currIndex = context.currIndex; // TODO: REVIEW: why do we need a currIndex? isn't it same as viewIndex here?
-    // SCIPIO: NOTE: in the original ProductSearchSession code, there was a disconnect between the paging
-    // flag and the actual result paging; here we actually will honor the paging flag (if specified)
-    kwsArgs.paging = context.paging; // Y/N indicator
-    kwsArgs.searchCatalogs = context.searchCatalogs; // this is a LIMIT, for security reasons has to belong to current store
-    kwsArgs.searchCategories = context.searchCategories;
-    kwsArgs.searchFeatures = context.searchFeatures;
-    kwsArgs.sortBy = context.searchSortBy;
-    kwsArgs.sortByReverse = context.searchSortByReverse;
-    kwsArgs.noConditionFind = noConditionFind;
-    kwsArgs.searchSortOrderString = context.searchSortOrderString;
-    kwsArgs.searchReturnFields = context.searchReturnFields;
+    // kwsArgs options - should be set through context.kwsArgs map.
+    // DEV NOTE: even the commented ones are valid to use. they must be set through context.kwsArgs map.
     
-    kwsParams = context.kwsParams; // user input parameters, only if localVarsOnly==false
+    // searchSyntax: "user", "full", "literal" - see SolrExprUtil.preparseUserQuery for values and known issues
+    // TODO: "user" is not implemented and does same as "full" - see SolrExprUtil.preparseUserQuery
+    kwsArgs.searchSyntax = kwsArgs.searchSyntax ?: "user";
+    kwsArgs.searchSyntaxQt = (kwsArgs.searchSyntax == "user") ? // used only when searchSyntax=="user"; NOTE: read from shop.properties if not set by screen
+        ((kwsArgs.searchSyntaxQt != null) ? kwsArgs.searchSyntaxQt : UtilProperties.getPropertyValue("shop", "shop.search.solr.queryType")) : null;
+    kwsArgs.searchString = sanitizeUserQueryExpr(kwsArgs.searchString); // WARN: setting this here overrides ALL the parameters.SEARCH_STRINGx expressions
+    kwsArgs.searchFilters = kwsArgs.searchFilters ? new ArrayList(kwsArgs.searchFilters) : new ArrayList(); // list
+    //kwsArgs.searchFilter = kwsArgs.searchFilter; // string or list; if string, it's split on whitespace to make list
+    //kwsArgs.excludeVariants = kwsArgs.searchExcludeVariants; // NOTE: should usually not specify this; is a ProductStore field
+    kwsArgs.viewSize = kwsArgs.viewSize != null ? kwsArgs.viewSize : context.viewSize;
+    kwsArgs.viewIndex = kwsArgs.viewIndex != null ? kwsArgs.viewIndex : context.viewIndex;
+    kwsArgs.currIndex = kwsArgs.currIndex != null ? kwsArgs.currIndex : context.currIndex; // TODO: REVIEW: why do we need a currIndex? isn't it same as viewIndex here?
+    //// SCIPIO: NOTE: in the original ProductSearchSession code, there was a disconnect between the paging
+    //// flag and the actual result paging; here we actually will honor the paging flag (if specified)
+    //kwsArgs.paging = kwsArgs.paging; // Y/N indicator
+    //kwsArgs.searchCatalogs = kwsArgs.searchCatalogs; // this is a LIMIT, for security reasons has to belong to current store
+    //kwsArgs.searchCategories = kwsArgs.searchCategories;
+    //kwsArgs.searchFeatures = kwsArgs.searchFeatures;
+    //kwsArgs.sortBy = kwsArgs.searchSortBy;
+    //kwsArgs.sortByReverse = kwsArgs.searchSortByReverse;
+    kwsArgs.noConditionFind = noConditionFind;
+    //kwsArgs.searchSortOrderString = kwsArgs.searchSortOrderString;
+    //kwsArgs.searchReturnFields = kwsArgs.searchReturnFields;
+    kwsArgs.priceSortField = kwsArgs.priceSortField ?: "exists"; // "min", "exists", "exact"
+    //kwsArgs.spellcheck = kwsArgs.spellcheck; // boolean, default false
+    //kwsArgs.facet = kwsArgs.facet; // boolean, default false
+    
     if (!localVarsOnly) {
         // REUSE the stock class where possibly so we might maintain some compatibility, duplicate less code,
         // and it does all the session stuff for us.
@@ -321,11 +331,12 @@ try {
                     ProductSearch.KeywordConstraint kc = (ProductSearch.KeywordConstraint) psc;
                     kwExpr = (kc.getKeywordsString() ?: "").trim();
                     if (kwExpr) {
+                        kwExpr = sanitizeUserQueryExpr(kwExpr);
                         // NOTE: OR is the usual default - we don't need to do anything in that case;
                         // but if AND is specified, then we need to add a "+" before every character...
                         if (kc.isAnd()) {
                             // WARN: FIXME: this is BEST-EFFORT - may break queries - see function
-                            kwExprList.add(SolrUtil.addPrefixToAllTerms(kwExpr, "+"));
+                            kwExprList.add(SolrExprUtil.addPrefixToAllTerms(kwExpr, "+"));
                         } else {
                             kwExprList.add(kwExpr);
                         }
@@ -365,7 +376,7 @@ try {
             }
             
             combineKwExpr = { exprList, joinOp ->
-                if (exprList.size() == 1) return sanitizeUserQueryExpr(exprList[0]);
+                if (exprList.size() == 1) return exprList[0];
                 StringBuilder sb = new StringBuilder();
                 sb.append("(");
                 sb.append(exprList[0]);
@@ -373,7 +384,7 @@ try {
                 String joinOpFull = " " + joinOp + " (";
                 for(int i=1; i<exprList.size(); i++) {
                     sb.append(joinOpFull);
-                    sb.append(sanitizeUserQueryExpr(exprList[i]));
+                    sb.append(exprList[i]);
                     sb.append(")");
                 }
                 return sb.toString();
@@ -394,7 +405,7 @@ try {
             if (sortOrder instanceof SortProductPrice) {
                 SortProductPrice so = (SortProductPrice) sortOrder;
                 kwsArgs.sortBy = com.ilscipio.solr.ProductUtil.getProductSolrPriceFieldNameFromEntityPriceType(so.getProductPriceTypeId(), 
-                    context.locale, "Keyword search: ");
+                    locale, "Keyword search: ");
                 if (kwsArgs.sortBy != "defaultPrice") {
                     // SPECIAL price search fallback - allows listPrice search to still work reasonably for products that don't have listPrice
                     // TODO?: REVIEW: query would be faster without function, but unclear if want to create
@@ -403,10 +414,16 @@ try {
                     //kwsArgs.searchReturnFields = (kwsArgs.searchReturnFields ?: "*") + 
                     //    ",sortPrice=if(exists(" + kwsArgs.sortBy + ")," + kwsArgs.sortBy + ",defaultPrice)";
                     //kwsArgs.sortBy = "sortPrice";
-                    kwsArgs.sortBy = "if(exists(" + kwsArgs.sortBy + ")," + kwsArgs.sortBy + ",defaultPrice)";
+                    if (kwsArgs.priceSortField == "min") {
+                        kwsArgs.sortBy = "if(exists(" + kwsArgs.sortBy + "),min(" + kwsArgs.sortBy + "," + "defaultPrice),defaultPrice)";
+                    } else if (kwsArgs.priceSortField == "exists") {
+                        kwsArgs.sortBy = "if(exists(" + kwsArgs.sortBy + ")," + kwsArgs.sortBy + ",defaultPrice)";
+                    } else { // if (kwsArgs.priceSortField == "exact") {
+                        //kwsArgs.sortBy = kwsArgs.sortBy; // redundant
+                    }
                 }
                 kwsArgs.sortByReverse = !so.isAscending();
-                kwsArgs.searchSortOrderString = so.prettyPrintSortOrder(false, context.locale);
+                kwsArgs.searchSortOrderString = so.prettyPrintSortOrder(false, locale);
             } else if (sortOrder instanceof SortProductFeature) {
                 // TODO?
                 //SortProductFeature so = (SortProductFeature) sortOrder;
@@ -415,17 +432,22 @@ try {
                 kwsArgs.sortBy = null;
                 kwsArgs.sortByReverse = null;
                 //kwsArgs.sortByReverse = !so.isAscending();
-                kwsArgs.searchSortOrderString = so.prettyPrintSortOrder(false, context.locale);
+                kwsArgs.searchSortOrderString = so.prettyPrintSortOrder(false, locale);
             } else if (sortOrder instanceof SortProductField) {
                 SortProductField so = (SortProductField) sortOrder;
                 // DEV NOTE: if you don't use this method, solr queries may crash on extra locales
-                simpleLocale = SolrUtil.getSolrSchemaLangLocaleValidOrDefault(context.locale);
+                simpleLocale = SolrLocaleUtil.getCompatibleLocaleValidOrProductStoreDefault(locale, productStore);
                 kwsArgs.sortBy = com.ilscipio.solr.ProductUtil.getProductSolrFieldNameFromEntity(so.getFieldName(), simpleLocale) ?: so.getFieldName();
                 if (kwsArgs.sortBy) {
                     kwsArgs.sortBy = com.ilscipio.solr.ProductUtil.getProductSolrSortFieldNameFromSolr(kwsArgs.sortBy, simpleLocale) ?: kwsArgs.sortBy;
+                    kwsArgs.sortBy = com.ilscipio.solr.ProductUtil.makeProductSolrSortFieldExpr(
+                            kwsArgs.sortBy, 
+                            SolrLocaleUtil.getCompatibleLocaleValid(locale),
+                            SolrLocaleUtil.getCompatibleProductStoreLocaleValid(productStore)
+                        ) ?: kwsArgs.sortBy;
                 }
                 kwsArgs.sortByReverse = !so.isAscending();
-                kwsArgs.searchSortOrderString = so.prettyPrintSortOrder(false, context.locale);
+                kwsArgs.searchSortOrderString = so.prettyPrintSortOrder(false, locale);
             } else {
                 Debug.logWarning("Solr: Keyword search: unrecognized sort order method: " + sortOrder.getClass().getName(), module);
             }
@@ -437,7 +459,7 @@ try {
 }
     
    
-if (!kwsArgs.searchSortOrderString) kwsArgs.searchSortOrderString = new org.ofbiz.product.product.ProductSearch.SortKeywordRelevancy().prettyPrintSortOrder(false, context.locale);
+if (!kwsArgs.searchSortOrderString) kwsArgs.searchSortOrderString = new org.ofbiz.product.product.ProductSearch.SortKeywordRelevancy().prettyPrintSortOrder(false, locale);
 
 // NOTE: these context assigns are here in case of fail
 // WARN: searchSortOrderString: should always be set to non-null, for the legacy template which crashes without it
@@ -463,7 +485,7 @@ if (!errorOccurred && ("Y".equals(kwsArgs.noConditionFind) || kwsArgs.searchStri
         else kwsArgs.searchString = "*:*";
 
         // FIXME?: whitespace escaping appears to not work...
-        //else if (!kwsArgs.searchSyntax) kwsArgs.searchString = SolrUtil.escapeTermPlain(kwsArgs.searchString);
+        //else if (!kwsArgs.searchSyntax) kwsArgs.searchString = SolrExprUtil.escapeTermPlain(kwsArgs.searchString);
         
         // early assign for info when query throws error
         context.currentSearch = kwsArgs.searchString; // DEPRECATED?
@@ -531,7 +553,7 @@ if (!errorOccurred && ("Y".equals(kwsArgs.noConditionFind) || kwsArgs.searchStri
                 if (category.exclude != null) {
                     sb.append(category.exclude ? "-" : "+");
                 }
-                sb.append(SolrUtil.makeCategoryIdFieldQueryEscape("cat", category.productCategoryId, category.includeSub != false));
+                sb.append(SolrExprUtil.makeCategoryIdFieldQueryEscape("cat", category.productCategoryId, category.includeSub != false));
                 catExprList.add(sb.toString());
             }
             // TODO: REVIEW: should this be a whole filter, or instead add each to searchFilters?
@@ -562,7 +584,9 @@ if (!errorOccurred && ("Y".equals(kwsArgs.noConditionFind) || kwsArgs.searchStri
             returnFields:kwsArgs.searchReturnFields,
             sortBy:kwsArgs.sortBy, sortByReverse:kwsArgs.sortByReverse,
             viewSize:kwsArgs.viewSize, viewIndex:kwsArgs.viewIndex, 
-            locale:context.locale, userLogin:context.userLogin, timeZone:context.timeZone];
+            queryType:kwsArgs.searchSyntaxQt, 
+            spellcheck:kwsArgs.spellcheck, facet:kwsArgs.facet,
+            locale:locale, userLogin:context.userLogin, timeZone:context.timeZone];
         
         if (DEBUG) Debug.logInfo("Keyword search params: " + kwsArgs, module);
         
@@ -640,9 +664,11 @@ if (!errorOccurred && ("Y".equals(kwsArgs.noConditionFind) || kwsArgs.searchStri
         else if (!(kwsArgs.currIndex instanceof Integer)) context.currIndex = Integer.parseInt(kwsArgs.currIndex).intValue();    
         
         categoriesTrail = [:];
-        for (facetField in result.facetFields.keySet())
-            if (facetField.equals("cat"))
-                categoriesTrail = result.facetFields.get(facetField);
+        if (result.facetFields) {
+            for (facetField in result.facetFields.keySet())
+                if (facetField.equals("cat"))
+                    categoriesTrail = result.facetFields.get(facetField);
+        }
         context.filterCategories = [:];
         for (categoryTrail in categoriesTrail.keySet()) {
             if (categoryTrail.split("/").length > 0) {
