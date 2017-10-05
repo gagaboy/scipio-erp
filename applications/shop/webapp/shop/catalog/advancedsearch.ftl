@@ -40,7 +40,7 @@ under the License.
         <@field type="text" name="SEARCH_STRING" size="32" value=(requestParameters.SEARCH_STRING!searchString!"") />
 
         <#-- SCIPIO: WARN: 2017-08-22: the "AND" option here may not be entirely reliable with Solr at this time;
-            the parsing needs work; see com.ilscipio.solr.SolrUtil#addPrefixToAllKeywords -->
+            the parsing needs work; see com.ilscipio.scipio.solr.SolrUtil#addPrefixToAllKeywords -->
         <@field type="radio" name="SEARCH_OPERATOR" value="OR" checked=(searchOperator == "OR") label=uiLabelMap.CommonAny />
         <@field type="radio" name="SEARCH_OPERATOR" value="AND" checked=(searchOperator == "AND") label=uiLabelMap.CommonAll/>
     </@field>
@@ -136,11 +136,15 @@ under the License.
             <#list searchConstraintStrings as searchConstraintString>
                 <div>&nbsp;-&nbsp;${searchConstraintString}</div>
             </#list>
+            
+         <#-- SCIPIO: 2017-09-14: REMOVED this option - it works in completely counter-intuitive way
             <div>${uiLabelMap.ProductSortedBy}: ${searchSortOrderString}</div>
             <div>
               <@field type="radio" name="clearSearch" value="Y" checked=true label=uiLabelMap.ProductNewSearch/>
               <@field type="radio" name="clearSearch" value="N" label=uiLabelMap.CommonRefineSearch/>
             </div>
+         -->
+            <@field type="hidden" name="clearSearch" value="Y"/>
       </@field>
     </#if>
     <@field type="submit" submitType="link" href="javascript:document.advtokeywordsearchform.submit()" class="${styles.link_run_sys!} ${styles.action_find!}" text=uiLabelMap.CommonFind />

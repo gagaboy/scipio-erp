@@ -52,20 +52,24 @@ import org.ofbiz.product.product.ProductSearch.SortProductField;
 import org.ofbiz.product.product.ProductSearch.SortProductPrice;
 import org.ofbiz.product.product.ProductSearch.SortProductFeature;
 import org.ofbiz.product.category.CategoryWorker;
-import com.ilscipio.solr.*;
+import com.ilscipio.scipio.solr.*;
+
+// SCIPIO: TODO?: this script has become huge; should move core to a util class somewhere for better reuse
 
 // SCIPIO: NOTE: This script is responsible for checking whether solr is applicable (if no check, implies the shop assumes solr is always enabled).
 final String module = "KeywordSearch.groovy";
-final boolean DEBUG = Debug.verboseOn();
-//final boolean DEBUG = true;
-final boolean useSolr = ("Y" == EntityUtilProperties.getPropertyValue("shop", "shop.useSolr", "Y", delegator)); // (TODO?: in theory this should be a ProductStore flag)
+boolean DEBUG = Debug.verboseOn();
+//DEBUG = true;
+
+// NOTE: 2017-08-28: All params should be passed in kwsArgs map
+kwsArgs = context.kwsArgs ? new HashMap(context.kwsArgs) : new HashMap();
+cfgPropRes = kwsArgs.cfgPropRes ?: "shop"; // shop.properties
+cfgPropPrefix = kwsArgs.cfgPropPrefix != null ? kwsArgs.cfgPropPrefix : "shop.";
+userSearchCfg = SolrProductUtil.readUserProductSearchConfig(delegator, cfgPropRes, cfgPropPrefix+"search.solr.", kwsArgs);
+
+final boolean useSolr = ("Y" == EntityUtilProperties.getPropertyValue(cfgPropRes, cfgPropPrefix+"useSolr", "Y", delegator)); // (TODO?: in theory this should be a ProductStore flag)
 
 errorOccurred = false;
-
-// NOTE: 2017-08-28: The script params are MOVED to a kwsArgs sub-map which caller must create/specify, 
-// because they clash with the output results. These inputs were all added by Scipio and they weren't used anywhere (at time of writing)...
-// See further below for possible values...
-kwsArgs = context.kwsArgs ? new HashMap(context.kwsArgs) : new HashMap();
 
 ProductSearchOptions kwsParams = context.kwsParams; // these usually come from the http request
 
@@ -92,7 +96,7 @@ context.remove("localVarsOnly");
 // This might have been a bug, but everyone is probably used to it by now, so I've made a new
 // property in shop.properties and set the default to Y (2017-08-17).
 //defaultNoConditionFind = EntityUtilProperties.getPropertyValue("widget", "widget.defaultNoConditionFind", delegator);
-defaultNoConditionFind = EntityUtilProperties.getPropertyValue("shop", "shop.search.defaultNoConditionFind", "Y", delegator);
+defaultNoConditionFind = EntityUtilProperties.getPropertyValue(cfgPropRes, cfgPropPrefix+"search.defaultNoConditionFind", "Y", delegator);
 
 noConditionFind = kwsArgs.noConditionFind != null ? kwsArgs.noConditionFind : context.noConditionFind;
 if (!localVarsOnly) {
@@ -145,6 +149,7 @@ if (context.useSolr == false || useSolr == false) {
 nowTimestamp = context.nowTimestamp ?: UtilDateTime.nowTimestamp();
 productStore = context.productStore ?: ProductStoreWorker.getProductStore(request);
 locale = context.locale;
+searchStringCount = 1;
 
 sanitizeUserQueryExpr = { expr ->
     if (expr instanceof String) {
@@ -167,10 +172,9 @@ try {
     // DEV NOTE: even the commented ones are valid to use. they must be set through context.kwsArgs map.
     
     // searchSyntax: "user", "full", "literal" - see SolrExprUtil.preparseUserQuery for values and known issues
-    // TODO: "user" is not implemented and does same as "full" - see SolrExprUtil.preparseUserQuery
     kwsArgs.searchSyntax = kwsArgs.searchSyntax ?: "user";
     kwsArgs.searchSyntaxQt = (kwsArgs.searchSyntax == "user") ? // used only when searchSyntax=="user"; NOTE: read from shop.properties if not set by screen
-        ((kwsArgs.searchSyntaxQt != null) ? kwsArgs.searchSyntaxQt : UtilProperties.getPropertyValue("shop", "shop.search.solr.queryType")) : null;
+        ((kwsArgs.searchSyntaxQt != null) ? kwsArgs.searchSyntaxQt : UtilProperties.getPropertyValue(cfgPropRes, cfgPropPrefix+"search.solr.queryType")) : null;
     kwsArgs.searchString = sanitizeUserQueryExpr(kwsArgs.searchString); // WARN: setting this here overrides ALL the parameters.SEARCH_STRINGx expressions
     kwsArgs.searchFilters = kwsArgs.searchFilters ? new ArrayList(kwsArgs.searchFilters) : new ArrayList(); // list
     //kwsArgs.searchFilter = kwsArgs.searchFilter; // string or list; if string, it's split on whitespace to make list
@@ -190,7 +194,7 @@ try {
     //kwsArgs.searchSortOrderString = kwsArgs.searchSortOrderString;
     //kwsArgs.searchReturnFields = kwsArgs.searchReturnFields;
     kwsArgs.priceSortField = kwsArgs.priceSortField ?: "exists"; // "min", "exists", "exact"
-    //kwsArgs.spellcheck = kwsArgs.spellcheck; // boolean, default false
+    //kwsArgs.spellcheck = kwsArgs.spellcheck;
     //kwsArgs.facet = kwsArgs.facet; // boolean, default false
     
     if (!localVarsOnly) {
@@ -236,6 +240,8 @@ try {
             // NOTE: basically, at the end, the OR list becomes a single entry of the AND list (this is ofbiz behavior,
             // and because the interface is ambiguous, better to preserve something known than introduce more randomness)
             kwExprList = [];
+            kwExprIsAndList = [];
+            kwExprAllIsAnd = true;
             
             kwCatalogCnsts = [];
             kwCategoryCnsts = [];
@@ -244,6 +250,7 @@ try {
             
             for(ProductSearchConstraint psc in pscList) {
                 if (psc instanceof ProductSearch.ExcludeVariantsConstraint) {
+                    // NOTE: 2017-09: even if this is not set, the default is now true
                     kwExcludeVariants = true;
                 } else if (psc instanceof ProductSearch.CatalogConstraint) { // SCIPIO: NOTE: we added this one here
                     ProductSearch.CatalogConstraint cc = (ProductSearch.CatalogConstraint) psc;
@@ -332,14 +339,9 @@ try {
                     kwExpr = (kc.getKeywordsString() ?: "").trim();
                     if (kwExpr) {
                         kwExpr = sanitizeUserQueryExpr(kwExpr);
-                        // NOTE: OR is the usual default - we don't need to do anything in that case;
-                        // but if AND is specified, then we need to add a "+" before every character...
-                        if (kc.isAnd()) {
-                            // WARN: FIXME: this is BEST-EFFORT - may break queries - see function
-                            kwExprList.add(SolrExprUtil.addPrefixToAllTerms(kwExpr, "+"));
-                        } else {
-                            kwExprList.add(kwExpr);
-                        }
+                        kwExprList.add(kwExpr);
+                        kwExprIsAndList.add(kc.isAnd());
+                        kwExprAllIsAnd = kwExprAllIsAnd && kc.isAnd();
                         // TODO?: handle for cases where no full/solr syntax allowed:
                         //kc.isAnyPrefix()
                         //kc.isAnySuffix()
@@ -375,6 +377,37 @@ try {
                 }
             }
             
+            resolveKwExprListIsAndManual = { forceOp ->
+                if (forceOp == "OR") return;
+                kwExprListPrev = kwExprList;
+                kwExprList = [];
+                for(int i=0; i<kwExprListPrev.size(); i++) {
+                    if (kwExprIsAndList[i] || forceOp == "AND") {
+                        // WARN: FIXME: this is BEST-EFFORT - may break queries - see function
+                        kwExprList.add(SolrExprUtil.addPrefixToAllTerms(kwExprListPrev[i], "+"));
+                    } else {
+                        kwExprList.add(kwExprListPrev[i]);
+                    }
+                }
+            };
+            // here we decide how we'll handle the default operator
+            // if user query and all search strings are AND we can use defaultOp on solrKeywordSearch for edismax,
+            // otherwise we have to use a custom method (much less reliable).
+            // NOTE: if defaultOp was already set in context (override), it is treated as an override (forceOp)
+            // and we always respect it (i.e. it overrides every isAnd() of every SEARCH_STRING)
+            if (kwsArgs.searchSyntax == "user") {
+                if (kwExprAllIsAnd) {
+                    if (!kwsArgs.defaultOp) kwsArgs.defaultOp = "AND";
+                    else if (kwsArgs.defaultOp != "AND") {
+                        resolveKwExprListIsAndManual(kwsArgs.defaultOp);
+                    }
+                } else {
+                    resolveKwExprListIsAndManual(kwsArgs.defaultOp);
+                }
+            } else {
+                resolveKwExprListIsAndManual(kwsArgs.defaultOp);
+            }
+
             combineKwExpr = { exprList, joinOp ->
                 if (exprList.size() == 1) return exprList[0];
                 StringBuilder sb = new StringBuilder();
@@ -389,11 +422,13 @@ try {
                 }
                 return sb.toString();
             };
-            if (DEBUG) Debug.logInfo("Keyword search params: kwExprList: " + kwExprList, module);
-            
             // make expression from AND list
-            if (!kwsArgs.searchString && kwExprList) kwsArgs.searchString = combineKwExpr(kwExprList, "AND");
-    
+            if (!kwsArgs.searchString && kwExprList) {
+                kwsArgs.searchString = combineKwExpr(kwExprList, "AND");
+                searchStringCount = kwExprList.size();
+            }
+            if (DEBUG) Debug.logInfo("Keyword search string: " + kwsArgs.searchString, module);
+            
             if (kwsArgs.searchCatalogs==null && kwCatalogCnsts) kwsArgs.searchCatalogs = kwCatalogCnsts;
             if (kwsArgs.searchCategories==null && kwCategoryCnsts) kwsArgs.searchCategories = kwCategoryCnsts;
             if (kwsArgs.searchFeatures==null && kwFeatureCnsts) kwsArgs.searchFeatures = kwFeatureCnsts;
@@ -404,7 +439,7 @@ try {
         if (!kwsArgs.sortBy && sortOrder != null) {
             if (sortOrder instanceof SortProductPrice) {
                 SortProductPrice so = (SortProductPrice) sortOrder;
-                kwsArgs.sortBy = com.ilscipio.solr.ProductUtil.getProductSolrPriceFieldNameFromEntityPriceType(so.getProductPriceTypeId(), 
+                kwsArgs.sortBy = SolrProductUtil.getProductSolrPriceFieldNameFromEntityPriceType(so.getProductPriceTypeId(), 
                     locale, "Keyword search: ");
                 if (kwsArgs.sortBy != "defaultPrice") {
                     // SPECIAL price search fallback - allows listPrice search to still work reasonably for products that don't have listPrice
@@ -437,12 +472,12 @@ try {
                 SortProductField so = (SortProductField) sortOrder;
                 // DEV NOTE: if you don't use this method, solr queries may crash on extra locales
                 simpleLocale = SolrLocaleUtil.getCompatibleLocaleValidOrProductStoreDefault(locale, productStore);
-                kwsArgs.sortBy = com.ilscipio.solr.ProductUtil.getProductSolrFieldNameFromEntity(so.getFieldName(), simpleLocale) ?: so.getFieldName();
+                kwsArgs.sortBy = SolrProductUtil.getProductSolrFieldNameFromEntity(so.getFieldName(), simpleLocale) ?: so.getFieldName();
                 if (kwsArgs.sortBy) {
-                    kwsArgs.sortBy = com.ilscipio.solr.ProductUtil.getProductSolrSortFieldNameFromSolr(kwsArgs.sortBy, simpleLocale) ?: kwsArgs.sortBy;
-                    kwsArgs.sortBy = com.ilscipio.solr.ProductUtil.makeProductSolrSortFieldExpr(
+                    kwsArgs.sortBy = SolrProductUtil.getProductSolrSortFieldNameFromSolr(kwsArgs.sortBy, simpleLocale) ?: kwsArgs.sortBy;
+                    kwsArgs.sortBy = SolrProductUtil.makeProductSolrSortFieldExpr(
                             kwsArgs.sortBy, 
-                            SolrLocaleUtil.getCompatibleLocaleValid(locale),
+                            SolrLocaleUtil.getCompatibleLocaleValid(locale, productStore),
                             SolrLocaleUtil.getCompatibleProductStoreLocaleValid(productStore)
                         ) ?: kwsArgs.sortBy;
                 }
@@ -506,23 +541,6 @@ if (!errorOccurred && ("Y".equals(kwsArgs.noConditionFind) || kwsArgs.searchStri
             } else {
                 kwsArgs.searchFilters.addAll(kwsArgs.searchFilter);
             }
-        } 
-        
-        if (kwsArgs.excludeVariants) {
-            hasVariantExpr = false;
-            for(filter in kwsArgs.searchFilters) {
-                // FIXME: heuristic regexp for isVariant: is unreliable and may be wrong... 
-                // should defer to a parsing utility...
-                if (filter.matches("^.*(\\+|-|\\b)isVariant:.*\$")) {
-                    hasVariantExpr = true;
-                    break;
-                }
-            }
-            if (!hasVariantExpr) {
-                // emulate ProductSearchSession EntityCondition.makeCondition("prodIsVariant", EntityOperator.NOT_EQUAL, "Y"),
-                // which was roughly correct
-                kwsArgs.searchFilters.add("-isVariant:true");
-            }
         }
         
         searchCatalogIds = new HashSet<>();
@@ -562,6 +580,16 @@ if (!errorOccurred && ("Y".equals(kwsArgs.noConditionFind) || kwsArgs.searchStri
             //context.searchCategoryIdEff = ...;
         }
         
+        // TODO: REVIEW: added this initially, but upon further review the +catalog: filter above should be sufficient,
+        // AS LONG AS catalog is not accepted from request parameters (incl. security)
+//        if (kwsArgs.searchProductStoreId != "NONE") {
+//            // NOTE: this must NOT be a request parameter - always search within store - only screen could override
+//            def searchProductStoreId = kwsArgs.searchProductStoreId ?: productStoreId;
+//            if (productStoreId) {
+//                kwsArgs.searchFilters.add("+productStore:"+SolrExprUtil.escapeTermFull(productStoreId));
+//            }
+//        }
+        
         /* TODO/FIXME: missing data in solr, can't implement...
         if (kwsArgs.searchFeatures) {
             catExprList = [];
@@ -580,15 +608,48 @@ if (!errorOccurred && ("Y".equals(kwsArgs.noConditionFind) || kwsArgs.searchStri
         if (kwsArgs.viewSize != null) kwsArgs.viewSize = kwsArgs.viewSize.toString();
         if (kwsArgs.viewIndex != null) kwsArgs.viewIndex = kwsArgs.viewIndex.toString();
         
-        solrKwsServCtx = [query:kwsArgs.searchString, queryFilters:kwsArgs.searchFilters, 
-            returnFields:kwsArgs.searchReturnFields,
-            sortBy:kwsArgs.sortBy, sortByReverse:kwsArgs.sortByReverse,
-            viewSize:kwsArgs.viewSize, viewIndex:kwsArgs.viewIndex, 
-            queryType:kwsArgs.searchSyntaxQt, 
-            spellcheck:kwsArgs.spellcheck, facet:kwsArgs.facet,
-            locale:locale, userLogin:context.userLogin, timeZone:context.timeZone];
+        queryFields = kwsArgs.queryFields;
         
-        if (DEBUG) Debug.logInfo("Keyword search params: " + kwsArgs, module);
+        if (queryFields == null && kwsArgs.searchSyntax == "user") {
+            def queryFieldsSet = SolrProductUtil.determineUserProductSearchQueryFields(delegator, 
+                locale, productStore, userSearchCfg);
+            queryFields = queryFieldsSet ? queryFieldsSet.join(" ") : null;
+        }
+        
+        if (kwsArgs.spellcheck == null) {
+            spellcheck = UtilProperties.getPropertyAsBoolean(cfgPropRes, cfgPropPrefix+"search.solr.spellcheck", null);
+            if (spellcheck != null) kwsArgs.spellcheck = spellcheck;
+            
+            if (kwsArgs.spellDict == null) {
+                def useStoreLocale = (userSearchCfg["i18nFieldsSelect"] != "user");
+                def spellDict = SolrLocaleUtil.determineSpellcheckI18nDictNames(locale, productStore, useStoreLocale, 
+                    UtilProperties.getPropertyValue(cfgPropRes, cfgPropPrefix+"search.solr.spellcheck.localDictBaseName"));
+                kwsArgs.spellDict = spellDict;
+            }
+        }
+        
+        solrKwsServCtx = [
+            query: kwsArgs.searchString, 
+            queryFilters: kwsArgs.searchFilters, 
+            returnFields: kwsArgs.searchReturnFields,
+            sortBy: kwsArgs.sortBy, 
+            sortByReverse: kwsArgs.sortByReverse,
+            viewSize: kwsArgs.viewSize, 
+            viewIndex: kwsArgs.viewIndex, 
+            queryType: kwsArgs.searchSyntaxQt, 
+            spellcheck: kwsArgs.spellcheck,
+            spellDict: kwsArgs.spellDict,
+            facet: kwsArgs.facet,
+            defaultOp: kwsArgs.defaultOp?:"OR", // TODO: REVIEW: hardcoding the default hardcoded here to follow the search param logic (not the solr config)
+            queryFields: queryFields?:null,
+            queryParams: kwsArgs.queryParams,
+            excludeVariants: kwsArgs.excludeVariants,
+            locale: locale, 
+            userLogin: context.userLogin, 
+            timeZone: context.timeZone
+        ];
+        
+        if (DEBUG) Debug.logInfo("Keyword search params: " + solrKwsServCtx, module);
         
         result = dispatcher.runSync("solrKeywordSearch", solrKwsServCtx, -1, true); // SEPARATE TRANSACTION so error doesn't crash screen
         
@@ -624,8 +685,10 @@ if (!errorOccurred && ("Y".equals(kwsArgs.noConditionFind) || kwsArgs.searchStri
         context.listSize = result.listSize;
         context.viewIndex = result.viewIndex;
         context.viewSize = result.viewSize;
-        
-        context.suggestions = result.suggestions;
+
+        context.tokenSuggestions = result.tokenSuggestions; // NOTE: 2017-09-14: this is unusable... use collations
+        // NOTE: collations display only supported if there was only one search string, because otherwise they won't match
+        context.fullSuggestions = (searchStringCount == 1) ? result.fullSuggestions : null;
         context.searchConstraintStrings = [];
         
         // SCIPIO: 2017-08-16: the following context assignments are template compatibility/legacy fields - based on: 
