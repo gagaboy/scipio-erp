@@ -1,5 +1,11 @@
+<#-- SCIPIO: Read-only catalog tree -->
+<#include "component://product/webapp/catalog/catalog/tree/treecommon.ftl">
+
+<#-- SCIPIO: NOTE: an updated and interactive version of catalog tree
+    now exists in EditCatalogTree*.ftl -->
+
 <#if security.hasEntityPermission("CATALOG", "_VIEW", session)>
-    <#assign treePlugin =[{"name":"massload"}]/>
+    <#assign treePlugin = [{"name":"massload"}]/>
     <#assign menuEvent>
             var $node = data.node;
             id = $node.id;
@@ -28,26 +34,26 @@
                     <@treeitem text=node.text!"" id=node.id!  parent=(node.parent!"#") 
                     attribs={"data":{"type":"${node.type!}","li_attr":node.li_attr}} 
                     state=nState
-                    icon="${styles.text_color_secondary} ${styles.icon!} ${styles.icon_prefix!}file"/>
+                    icon="${styles.text_color_secondary!} ${styles.icon!} ${styles.icon_prefix!}file"/>
                 <#break>
                 <#case "category">
                     <#if nState>
                         <@treeitem text=node.text!"" id=node.id!  parent=(node.parent!"#") 
                         attribs={"data":{"type":"${node.type!}","li_attr":node.li_attr}} 
                         state=node.state
-                        icon="${styles.text_color_secondary} ${styles.icon!} ${styles.icon_prefix!}folder-open"/>
+                        icon="${styles.text_color_secondary!} ${styles.icon!} ${styles.icon_prefix!}folder-open"/>
                     <#else>
                         <@treeitem text=node.text!"" id=node.id!  parent=(node.parent!"#") 
                         attribs={"data":{"type":"${node.type!}","li_attr":node.li_attr}} 
                         state=nState
-                        icon="${styles.text_color_secondary} ${styles.icon!} ${styles.icon_prefix!}folder"/>
+                        icon="${styles.text_color_secondary!} ${styles.icon!} ${styles.icon_prefix!}folder"/>
                     </#if>
                 <#break>
                 <#case "catalog">
                     <@treeitem text=node.text!"" id=node.id!  parent=(node.parent!"#") 
                     attribs={"data":{"type":"${node.type!}","li_attr":node.li_attr}} 
                     state=nState
-                    icon="${styles.text_color_secondary} ${styles.icon!} ${styles.icon_prefix!}cubes"/>
+                    icon="${styles.text_color_secondary!} ${styles.icon!} ${styles.icon_prefix!}cubes"/>
                 <#break>
             </#switch>
         </#list>

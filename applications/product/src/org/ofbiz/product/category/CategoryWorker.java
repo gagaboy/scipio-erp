@@ -21,6 +21,7 @@ package org.ofbiz.product.category;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
@@ -46,16 +47,10 @@ import org.ofbiz.entity.condition.EntityCondition;
 import org.ofbiz.entity.condition.EntityOperator;
 import org.ofbiz.entity.util.EntityQuery;
 import org.ofbiz.entity.util.EntityUtil;
-import org.ofbiz.product.product.ProductContentWrapper;
 import org.ofbiz.product.product.ProductWorker;
 import org.ofbiz.service.DispatchContext;
-import org.ofbiz.service.GenericServiceException;
 import org.ofbiz.service.LocalDispatcher;
 import org.ofbiz.service.ServiceUtil;
-
-import com.ilscipio.scipio.treeMenu.TreeDataItem;
-import com.ilscipio.scipio.treeMenu.jsTree.JsTreeDataItem;
-import com.ilscipio.scipio.treeMenu.jsTree.JsTreeDataItem.JsTreeDataItemState;
 
 import javolution.util.FastList;
 
@@ -605,106 +600,6 @@ public class CategoryWorker {
     }
 
     /**
-     * SCIPIO: Retrieves categories based on either a list of
-     * ProductCategoryRollup or ProdCatalogCategory and returns a list of
-     * TreeDataItem representing categories
-     * 
-     * @param delegator
-     * @param dispatcher
-     * @param productCategories
-     * @return
-     * @throws GenericEntityException
-     * @throws GenericServiceException
-     */
-    public static List<? extends TreeDataItem> getTreeCategories(Delegator delegator, LocalDispatcher dispatcher, Locale locale,
-            List<GenericValue> productCategories, String library, String parentId) throws GenericEntityException, GenericServiceException {
-        List<TreeDataItem> treeDataItemList = FastList.newInstance();
-        for (GenericValue productCategory : productCategories) {
-            GenericValue category = null;
-            if (productCategory.getModelEntity().getEntityName().equals("ProductCategoryRollup")) {
-                category = productCategory.getRelatedOne("CurrentProductCategory", true);
-            } else if (productCategory.getModelEntity().getEntityName().equals("ProdCatalogCategory")) {
-                category = productCategory.getRelatedOne("ProductCategory", true);
-            }
-            if (UtilValidate.isNotEmpty(category)) {
-                List<GenericValue> childProductCategoryRollups = EntityQuery.use(delegator).from("ProductCategoryRollup")
-                        .where("parentProductCategoryId", category.getString("productCategoryId")).orderBy("sequenceNum").cache(true).queryList();
-                if (UtilValidate.isNotEmpty(childProductCategoryRollups))
-                    treeDataItemList.addAll(
-                            getTreeCategories(delegator, dispatcher, locale, childProductCategoryRollups, library, category.getString("productCategoryId")));
-
-                Map<String, Object> productCategoryMembers = dispatcher.runSync("getProductCategoryMembers",
-                        UtilMisc.toMap("categoryId", productCategory.getString("productCategoryId")));
-                if (UtilValidate.isNotEmpty(productCategoryMembers) && UtilValidate.isNotEmpty(productCategoryMembers.get("categoryMembers"))) {
-                    treeDataItemList.addAll(getTreeProducts(dispatcher, locale, UtilGenerics.<GenericValue>checkList(productCategoryMembers.get("categoryMembers")), library,
-                            productCategory.getString("productCategoryId")));
-                }
-
-                String categoryId = category.getString("productCategoryId");
-                
-                String categoryName = null;
-                CategoryContentWrapper wrapper = new CategoryContentWrapper(dispatcher, category, locale, null);
-                categoryName = wrapper.get("CATEGORY_NAME");
-                if (UtilValidate.isEmpty(categoryName)) {
-                    // 2016-03-22: Some categories don't have a name but have description
-                    categoryName = wrapper.get("DESCRIPTION");
-                    if (UtilValidate.isEmpty(categoryName)) {
-                        categoryName = category.getString("productCategoryId");
-                    }
-                }
-
-                if (library.equals("jsTree")) {
-                    JsTreeDataItem dataItem = null;
-                    dataItem = new JsTreeDataItem(categoryId, categoryName + " [" + categoryId + "]", "jstree-folder", new JsTreeDataItemState(false, false),
-                            parentId);
-                    dataItem.setType("category");
-                    if (UtilValidate.isNotEmpty(dataItem))
-                        treeDataItemList.add(dataItem);
-                }
-            }
-        }
-        return treeDataItemList;
-    }
-
-    /**
-     * SCIPIO: Retrieves products members for a given category and returns a list
-     * of JsTreeDataItem representing products
-     * 
-     * @param delegator
-     * @param dispatcher
-     * @param productCategories
-     * @return
-     * @throws GenericEntityException
-     * @throws GenericServiceException
-     */
-    public static List<? extends TreeDataItem> getTreeProducts(LocalDispatcher dispatcher, Locale locale, List<GenericValue> productCategoryMembers,
-            String library, String parentId) throws GenericEntityException {
-        List<TreeDataItem> products = FastList.newInstance();
-        if (UtilValidate.isNotEmpty(productCategoryMembers)) {
-            for (GenericValue productCategoryMember : productCategoryMembers) {
-                GenericValue product = productCategoryMember.getRelatedOne("Product", true);
-
-                String productId = product.getString("productId");
-                String productName = product.getString("productName");
-                if (UtilValidate.isEmpty(productName)) {
-                    productName = productId;
-                    ProductContentWrapper wrapper = new ProductContentWrapper(dispatcher, product, locale, null);
-                    if (UtilValidate.isNotEmpty(wrapper.get("PRODUCT_NAME")))
-                        productName = wrapper.get("PRODUCT_NAME");
-                }
-
-                if (library.equals("jsTree")) {
-                    JsTreeDataItem dataItem = new JsTreeDataItem(productId, productName + " [" + productId + "]", "jstree-file",
-                            new JsTreeDataItemState(false, false), parentId);
-                    dataItem.setType("product");
-                    products.add(dataItem);
-                }
-            }
-        }
-        return products;
-    }
-    
-    /**
      * SCIPIO: Returns true only if the category ID is child of the given parent category ID.
      * <p>
      * NOTE: is caching
@@ -909,5 +804,92 @@ public class CategoryWorker {
         return getCategoryForProductFromTrail(request, productId, CategoryWorker.getTrail(request));
     }
     
+    /**
+     * SCIPIO: For each simple-text-compatible prodCatContentTypeId, returns a list of complex record views,
+     * where the first entry is ProductCategoryContentAndElectronicText and the following entries (if any)
+     * are ContentAssocToElectronicText views.
+     * <p>
+     * NOTE: If there are multiple ProductCategoryContent for same cat/type, this fetches the lastest only (logs warning).
+     * System or user is expected to prevent this.
+     * <p>
+     * filterByDate must be set to a value in order to filter by date.
+     * Added 2017-10-27.
+     */
+    public static Map<String, List<GenericValue>> getProductCategoryContentLocalizedSimpleTextViews(Delegator delegator, LocalDispatcher dispatcher,
+            String productCategoryId, Collection<String> prodCatContentTypeIdList, java.sql.Timestamp filterByDate, boolean useCache) throws GenericEntityException {
+        Map<String, List<GenericValue>> fieldMap = new HashMap<>();
+        
+        List<EntityCondition> typeIdCondList = new ArrayList<>(prodCatContentTypeIdList.size());
+        if (prodCatContentTypeIdList != null) {
+            for(String prodCatContentTypeId : prodCatContentTypeIdList) {
+                typeIdCondList.add(EntityCondition.makeCondition("prodCatContentTypeId", prodCatContentTypeId));
+            }
+        }
+        List<EntityCondition> condList = new ArrayList<>();
+        condList.add(EntityCondition.makeCondition("productCategoryId", productCategoryId));
+        if (typeIdCondList.size() > 0) {
+            condList.add(EntityCondition.makeCondition(typeIdCondList, EntityOperator.OR));
+        }
+        if (filterByDate != null) {
+            condList.add(EntityUtil.getFilterByDateExpr(filterByDate));
+        }
+        condList.add(EntityCondition.makeCondition("drDataResourceTypeId", "ELECTRONIC_TEXT"));
+        
+        List<GenericValue> prodCatContentList = delegator.findList("ProductCategoryContentAndElectronicText", 
+                EntityCondition.makeCondition(condList, EntityOperator.AND), null, UtilMisc.toList("fromDate DESC"), null, useCache);
+        for(GenericValue prodCatContent : prodCatContentList) {
+            String prodCatContentTypeId = prodCatContent.getString("prodCatContentTypeId");
+            if (fieldMap.containsKey(prodCatContentTypeId)) {
+                Debug.logWarning("getProductCategoryContentLocalizedSimpleTextViews: multiple ProductCategoryContentAndElectronicText"
+                        + " records found for prodCatContentTypeId '" + prodCatContentTypeId + "' for productCategoryId '" + productCategoryId + "'; "
+                        + " returning first found only (this may cause unexpected texts to appear)", module);
+                continue;
+            }
+            String contentIdStart = prodCatContent.getString("contentId");
+            
+            condList = new ArrayList<>();
+            condList.add(EntityCondition.makeCondition("contentIdStart", contentIdStart));
+            condList.add(EntityCondition.makeCondition("contentAssocTypeId", "ALTERNATE_LOCALE"));
+            if (filterByDate != null) {
+                condList.add(EntityUtil.getFilterByDateExpr(filterByDate));
+            }
+            condList.add(EntityCondition.makeCondition("drDataResourceTypeId", "ELECTRONIC_TEXT"));
+            List<GenericValue> contentAssocList = delegator.findList("ContentAssocToElectronicText", 
+                    EntityCondition.makeCondition(condList, EntityOperator.AND), null, UtilMisc.toList("fromDate DESC"), null, useCache);
+            
+            List<GenericValue> valueList = new ArrayList<>(contentAssocList.size() + 1);
+            valueList.add(prodCatContent);
+            valueList.addAll(contentAssocList);
+            fieldMap.put(prodCatContentTypeId, valueList);
+        }
+        
+        return fieldMap;
+    }
     
+    /**
+     * SCIPIO: rearranges a viewsByType map into viewsByTypeAndLocale map.
+     * Logs warnings if multiple records for same locales.
+     * Added 2017-10-27.
+     */
+    public static Map<String, Map<String, GenericValue>> splitContentLocalizedSimpleTextContentAssocViewsByLocale(Map<String, List<GenericValue>> viewsByType) {
+        Map<String, Map<String, GenericValue>> viewsByTypeAndLocale = new HashMap<>();
+        
+        for(Map.Entry<String, List<GenericValue>> entry : viewsByType.entrySet()) {
+            Map<String, GenericValue> viewsByLocale = new HashMap<>();
+            for(GenericValue view : entry.getValue()) {
+                String localeString = view.getString("localeString");
+                if (viewsByLocale.containsKey(localeString)) {
+                    Debug.logWarning("splitContentLocalizedSimpleTextContentAssocViewsByLocale: multiple eligible records found"
+                            + " for localeString '" + localeString + "'; using first found only (this may cause unexpected texts to appear)."
+                            + " Offending value: " + view.toString(), module);
+                    continue;
+                }
+                viewsByLocale.put(localeString, view);
+            }
+            viewsByTypeAndLocale.put(entry.getKey(), viewsByLocale);
+        }
+        
+        return viewsByTypeAndLocale;
+    }
+     
 }
