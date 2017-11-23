@@ -39,6 +39,7 @@ import org.ofbiz.entity.util.EntityUtilProperties;
 import org.ofbiz.product.config.ProductConfigWrapper;
 import org.ofbiz.product.product.ProductContentWrapper;
 import org.ofbiz.product.product.ProductWorker;
+import org.ofbiz.product.store.ProductStoreWorker;
 import org.ofbiz.service.DispatchContext;
 import org.ofbiz.service.LocalDispatcher;
 import org.ofbiz.service.ModelService;
@@ -125,6 +126,14 @@ public abstract class SolrProductUtil {
     
     public static String getConfiguredDefaultCurrency(GenericValue productStore) {
         return getConfiguredDefaultCurrency(null, productStore);
+    }
+    
+    public static String getConfiguredForceDefaultCurrency(GenericValue productStore) {
+        return configuredForceDefaultCurrency;
+    }
+    
+    public static String getConfiguredForceDefaultCurrency(Delegator delegator) {
+        return configuredForceDefaultCurrency;
     }
     
     /**
@@ -392,10 +401,8 @@ public abstract class SolrProductUtil {
             List<GenericValue> productVariantAssocs = ProductWorker.getVariantVirtualAssocs(product, useCache);
             
             // 2017-09: do EARLY cat lookup so that we can find out a ProductStore
-            EntityCondition cond = EntityCondition.makeCondition(EntityCondition.makeCondition("productId", productId),
-                        EntityOperator.AND,
-                        EntityUtil.getFilterByDateExpr());
-            List<GenericValue> categories = delegator.findList("ProductCategoryMember", cond, null, null, null, useCache);
+            List<GenericValue> categories = EntityQuery.use(delegator).from("ProductCategoryMember").where("productId", productId)
+                    .filterByDate().cache(useCache).queryList();
             Set<String> productCategoryIds = new LinkedHashSet<>();
             SolrCategoryUtil.addAllStringFieldList(productCategoryIds, categories, "productCategoryId");
             
@@ -403,10 +410,8 @@ public abstract class SolrProductUtil {
             if (UtilValidate.isNotEmpty(productVariantAssocs)) {
                 for(GenericValue productVariantAssoc : productVariantAssocs) {
                     String virtualProductId = productVariantAssoc.getString("productId");
-                    cond = EntityCondition.makeCondition(EntityCondition.makeCondition("productId", virtualProductId),
-                            EntityOperator.AND,
-                            EntityUtil.getFilterByDateExpr());
-                    List<GenericValue> virtualCategories = delegator.findList("ProductCategoryMember", cond, null, null, null, useCache);
+                    List<GenericValue> virtualCategories = EntityQuery.use(delegator).from("ProductCategoryMember")
+                            .where("productId", virtualProductId).filterByDate().cache(useCache).queryList();
                     SolrCategoryUtil.addAllStringFieldList(productCategoryIds, virtualCategories, "productCategoryId");
                 }
             }
@@ -451,7 +456,10 @@ public abstract class SolrProductUtil {
             dispatchContext.put("productStore", SolrCategoryUtil.getStringFieldList(productStores, "productStoreId"));
             
             // MAIN STORE SELECTION AND LOCALE LOOKUP
-            GenericValue productStore = EntityUtil.getFirst(productStores);
+            // NOTE: we skip the isContentReference warning if there's both a forced locale and forced currency.
+            GenericValue productStore = ProductStoreWorker.getContentReferenceStoreOrFirst(productStores, 
+                    (SolrLocaleUtil.getConfiguredForceDefaultLocale(delegator) == null || SolrProductUtil.getConfiguredForceDefaultCurrency(delegator) == null) 
+                        ? ("product '" + productId + "'") : null);
             List<Locale> locales = SolrLocaleUtil.getConfiguredLocales(productStore);
             Locale defaultProductLocale = SolrLocaleUtil.getConfiguredDefaultLocale(productStore);
             
