@@ -1966,6 +1966,7 @@
     </property>
     <property key="ContentLatest">
         <value xml:lang="da">Senest</value>
+        <value xml:lang="de">Neueste</value>
         <value xml:lang="en">Latest</value>
         <value xml:lang="fr">Dernier</value>
         <value xml:lang="it">Ultimo</value>
@@ -7641,6 +7642,10 @@
         <value xml:lang="zh">生成缺失的搜索引擎优化的网址</value>
         <value xml:lang="zh_TW">產生缺失的搜尋引擎優化的網址</value>
     </property>
+    <property key="PageTitleRemoveWebSiteSEO"><!-- SCIPIO: new -->
+        <value xml:lang="en">Remove SEO URLs</value>
+        <value xml:lang="de">SEO-URLs entfernen</value>
+    </property>
     <property key="ContentNewWebSite">
         <value xml:lang="de">Neue Webseite</value>
         <value xml:lang="da">Opret ny Webside</value>
@@ -7729,8 +7734,20 @@
         <value xml:lang="en">This automatically generates alternative URLs from product and category names using the SEO configuration specified in SeoConfig.xml (/applications/product/config/SeoConfig.xml).</value>
         <value xml:lang="de">Mit Hilfe dieses Service können die URLs für alle Produkt- und Kategorienamen mithilfe der in SeoConfig.xml (/applications/product/config/SeoConfig.xml) angegebenen SEO-Konfiguration neu generiert werden.</value>
     </property>
+    <property key="ContentRemoveSeoUrlInfo">
+        <value xml:lang="en">This removes alternative URLs for the website. If you experience errors during generation and have no important data in these records, sometimes removing before generating again can solve issues with old or incompatible data.</value>
+        <value xml:lang="de">Dadurch werden alternative URLs für die Website entfernt. Wenn während der Generierung Fehler auftreten und keine wichtigen Daten in diesen Datensätzen vorhanden sind, können durch das Entfernen vor der erneuten Generierung Probleme mit alten oder inkompatiblen Daten behoben werden.</value>
+    </property>
     <property key="ContentGenerateSeoUrlInfoMayChangeUrls">
         <value xml:lang="en">Note: This may change all category/product URLs in the store (turn off "Replace Existing" to generate missing only).</value>
         <value xml:lang="de">Hinweis: Dies kann alle Kategorie-/Produkt-URLs im Store ändern (deaktivieren Sie "Bestehende ersetzen", um nur fehlende zu generieren).</value>
+    </property>
+    <property key="ContentMainStcLocFieldInfo">
+        <value xml:lang="en">This locale field entry (the first) corresponds to the main Content record for this field type (${typeField}: ${typeName}); the following entries (if any) will be linked to this one by contentAssocTypeId ALTERNATE_LOCALE content association.</value>
+        <value xml:lang="de">Dieser Gebietsschema-Feldeintrag (der erste) entspricht dem Hauptinhaltsdatensatz für diesen Feldtyp (${typeField}: ${typeName}); Die folgenden Einträge (falls vorhanden) werden durch die Inhaltsverknüpfung contentAssocTypeId ALTERNATE_LOCALE mit dieser verknüpft.</value>
+    </property>
+    <property key="ContentAltStcLocFieldInfo">
+        <value xml:lang="en">This locale field entry corresponds to an ALTERNATE_LOCALE Content record associated to the main Content record for this field type (${typeField}: ${typeName}), denoted by the first locale field entry above.</value>
+        <value xml:lang="de">Dieser Gebietsschema-Feldeintrag entspricht einem ALTERNATE_LOCALE-Inhaltsdatensatz, der dem Hauptinhaltsdatensatz für diesen Feldtyp (${typeField}: ${typeName}) zugeordnet ist und durch den ersten Gebietsschema-Eintrag oben angegeben wird.</value>
     </property>
 </resource>

@@ -1045,6 +1045,11 @@ under the License.
             <result-to-result result-name="productCategoryId"/>
             <result-to-result result-name="fromDate"/>
         </call-service>
+        
+        <if-compare field="parameters.updateLocalizedTexts" type="Boolean" operator="equals" value="true">
+            <set-service-fields service-name="replaceProductContentLocalizedSimpleTexts" to-map="updateLocTextCtx" map="parameters"/>
+            <call-service service-name="replaceProductContentLocalizedSimpleTexts" in-map-name="updateLocTextCtx"/>
+        </if-compare>
     </simple-method>
     
     <simple-method method-name="updateProductAndCatAssocVersatile">
@@ -1053,6 +1058,11 @@ under the License.
         
         <set-service-fields service-name="updateProductToCategory" to-map="updateAssocCtx" map="parameters"/>
         <call-service service-name="updateProductToCategory" in-map-name="updateAssocCtx"/>
+        
+        <if-compare field="parameters.updateLocalizedTexts" type="Boolean" operator="equals" value="true">
+            <set-service-fields service-name="replaceProductContentLocalizedSimpleTexts" to-map="updateLocTextCtx" map="parameters"/>
+            <call-service service-name="replaceProductContentLocalizedSimpleTexts" in-map-name="updateLocTextCtx"/>
+        </if-compare>
     </simple-method>
     
     <simple-method method-name="deleteProductCatAssocVersatile">
@@ -1139,6 +1149,21 @@ under the License.
         <remove-by-and entity-name="ProductConfigStats" map="prodIdMap"/>
         <remove-by-and entity-name="ConfigOptionProductOption" map="prodIdMap"/>
         
+        <remove-by-and entity-name="GoodIdentification" map="prodIdMap"/>
+        
+        <!-- According to Ofbiz schema, it is illegal to remove this, so...
+        <entity-and entity-name="InventoryItem" list="inventoryItemList">
+            <field-map field-name="productId" from-field="prodIdMap.productId"/>
+        </entity-and>
+        <iterate list="inventoryItemList" entry="inventoryItem">
+            <remove-related relation-name="InventoryItemDetail" value-field="inventoryItem"/>
+            <remove-value value-field="inventoryItem"/>
+        </iterate>
+        <remove-by-and entity-name="InventoryItemTempRes" map="prodIdMap"/>
+        -->
+         
+        <remove-by-and entity-name="ProductPaymentMethodType" map="prodIdMap"/>
+
         <!-- TODO: REVIEW: 
             FixedAsset -> instanceOfProductId
             FixedAssetProduct
@@ -1176,13 +1201,7 @@ under the License.
             ProductFacilityLocation
             ProductFeatureAppl
             ProductFeatureApplAttr
-            
-            InventoryItem
-            InventoryItemTempRes
-            ProductPaymentMethodType
-            
-            GoodIdentification
-            
+
             ProductGlAccount
             ProductKeyword
             ProductMeter
@@ -1224,6 +1243,8 @@ under the License.
                 <set field="contentRemoveCtx" set-if-null="true" value=""/>
                 <set field="contentRemoveCtx.contentId" from-field="productContent.contentId"/>
                 <set field="contentRemoveCtx.recursiveTarget" from-field="parameters.deleteContentRecursive"/>
+                <remove-value value-field="productContent"/>
+                <check-errors/>
                 <call-service service-name="removeContentAndRelatedRecursiveTo" in-map-name="contentRemoveCtx"/>
             </iterate>
         </if-not-empty>
@@ -1326,5 +1347,22 @@ under the License.
         <!-- move is simply delete + copy for us -->
         <call-simple-method method-name="copyProductCatAssocVersatile"/>
         <check-errors/>
+    </simple-method>
+    
+    <simple-method method-name="getProductExtendedDataVersatile">
+        <entity-one entity-name="Product" value-field="product"/>
+        <field-to-result field="product"/>
+        <if-empty field="product">
+            <property-to-field resource="ProductUiLabels" property="ProductProductNotFound" field="errMsgStr" />
+            <add-error><fail-message message="${errMsgStr}: ${parameters.productId}"/></add-error>
+            <check-errors/>
+        </if-empty>
+        
+        <set-service-fields service-name="getProductContentLocalizedSimpleTextViews" to-map="locTextCtx" map="parameters"/>
+        <call-service service-name="getProductContentLocalizedSimpleTextViews" in-map-name="locTextCtx">
+            <result-to-result result-name="viewsByType"/>
+            <result-to-result result-name="viewsByTypeAndLocale"/>
+            <result-to-result result-name="textByTypeAndLocale"/>
+        </call-service>
     </simple-method>
 </simple-methods>

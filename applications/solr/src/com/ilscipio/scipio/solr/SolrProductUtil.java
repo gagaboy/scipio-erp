@@ -419,7 +419,7 @@ public abstract class SolrProductUtil {
             // Trying to set a correctand trail
             Collection<String> trails = new LinkedHashSet<String>();
             for (String productCategoryId : productCategoryIds) {
-                List<List<String>> trailElements = SolrCategoryUtil.getCategoryTrail(productCategoryId, dctx);
+                List<List<String>> trailElements = SolrCategoryUtil.getCategoryTrail(productCategoryId, dctx, useCache);
                 for (List<String> trailElement : trailElements) {
                     StringBuilder catMember = new StringBuilder();
                     int i = 0;
@@ -467,7 +467,7 @@ public abstract class SolrProductUtil {
             Map<String, ProductContentWrapper> pcwMap = new HashMap<>();
             List<ProductContentWrapper> pcwList = new ArrayList<>(locales.size());
             for(Locale locale : locales) {
-                ProductContentWrapper pcw = new ProductContentWrapper(dispatcher, product, locale, null);
+                ProductContentWrapper pcw = new ProductContentWrapper(dispatcher, product, locale, null, useCache);
                 pcwMap.put(SolrLocaleUtil.getLangCode(locale), pcw);
                 pcwList.add(pcw);
             }
@@ -506,12 +506,12 @@ public abstract class SolrProductUtil {
             // if(category.size()>0) dispatchContext.put("category", category);
             // if(product.get("popularity") != null) dispatchContext.put("popularity", "");
 
-            Map<String, Object> featureSet = dispatcher.runSync("getProductFeatureSet", UtilMisc.toMap("productId", productId, "emptyAction", "success"));
+            Map<String, Object> featureSet = dispatcher.runSync("getProductFeatureSet", UtilMisc.toMap("productId", productId, "emptyAction", "success", "useCache", useCache));
             if (featureSet != null) {
                 dispatchContext.put("features", (Set<?>) featureSet.get("featureSet"));
             }
 
-            Map<String, Object> productInventoryAvailable = dispatcher.runSync("getProductInventoryAvailable", UtilMisc.toMap("productId", productId));
+            Map<String, Object> productInventoryAvailable = dispatcher.runSync("getProductInventoryAvailable", UtilMisc.toMap("productId", productId, "useCache", useCache));
             String inStock = null;
             BigDecimal availableToPromiseTotal = (BigDecimal) productInventoryAvailable.get("availableToPromiseTotal");
             if (availableToPromiseTotal != null) {
@@ -519,18 +519,14 @@ public abstract class SolrProductUtil {
             }
             dispatchContext.put("inStock", inStock);
 
-            Boolean isVirtual = ProductWorker.isVirtual(delegator, productId);
-            if (isVirtual)
-                dispatchContext.put("isVirtual", isVirtual);
-            Boolean isVariant = ProductWorker.isVariant(delegator, productId);
-            if (isVariant) // new 2017-08-17
-                dispatchContext.put("isVariant", isVariant); 
-            Boolean isDigital = ProductWorker.isDigital(product);
-            if (isDigital)
-                dispatchContext.put("isDigital", isDigital);
-            Boolean isPhysical = ProductWorker.isPhysical(product);
-            if (isPhysical)
-                dispatchContext.put("isPhysical", isPhysical);
+            boolean isVirtual = "Y".equals(product.getString("isVirtual"));
+            if (isVirtual) dispatchContext.put("isVirtual", isVirtual);
+            boolean isVariant = "Y".equals(product.getString("isVariant"));
+            if (isVariant) dispatchContext.put("isVariant", isVariant); // new 2017-08-17
+            boolean isDigital = ProductWorker.isDigital(product);
+            if (isDigital) dispatchContext.put("isDigital", isDigital);
+            boolean isPhysical = ProductWorker.isPhysical(product);
+            if (isPhysical) dispatchContext.put("isPhysical", isPhysical);
 
             dispatchContext.put("title", getLocalizedContentStringMap(delegator, dispatcher, product, "PRODUCT_NAME", locales, defLocale, pcwList, useCache));
             dispatchContext.put("description", getLocalizedContentStringMap(delegator, dispatcher, product, "DESCRIPTION", locales, defLocale, pcwList, useCache));
@@ -562,6 +558,7 @@ public abstract class SolrProductUtil {
                 Map<String, Object> priceContext = UtilMisc.toMap("product", product);
                 priceContext.put("currencyUomId", currencyUomId);
                 SolrProductSearch.copyStdServiceFieldsNotSet(context, priceContext);
+                priceContext.put("useCache", useCache);
                 Map<String, Object> priceMap = dispatcher.runSync("calculateProductPrice", priceContext);
                 if (priceMap.get("listPrice") != null) {
                     String listPrice = ((BigDecimal) priceMap.get("listPrice")).setScale(2, BigDecimal.ROUND_HALF_DOWN).toString();
@@ -673,7 +670,7 @@ public abstract class SolrProductUtil {
         
         List<GenericValue> productContentList = EntityQuery.use(delegator).from("ProductContent").where("productId", productId, "productContentTypeId", productContentTypeId).orderBy("-fromDate").cache(useCache).filterByDate().queryList();
         if (UtilValidate.isEmpty(productContentList) && ("Y".equals(product.getString("isVariant")))) {
-            GenericValue parent = ProductWorker.getParentProduct(productId, delegator);
+            GenericValue parent = ProductWorker.getParentProduct(productId, delegator, useCache);
             if (UtilValidate.isNotEmpty(parent)) {
                 productContentList = EntityQuery.use(delegator).from("ProductContent").where("productId", parent.get("productId"), "productContentTypeId", productContentTypeId).orderBy("-fromDate").cache(useCache).filterByDate().queryList();
             }
@@ -689,15 +686,24 @@ public abstract class SolrProductUtil {
             return;
         }
         
+        //boolean deepCache = useCache; // SCIPIO: SPECIAL: only way to prevent all caching
+        
         String thisLocaleString = (String) content.get("localeString");
         thisLocaleString = (thisLocaleString != null) ? thisLocaleString : "";
-        // special case: no locale string: treat as general (NOTE: here give the EntityFieldValue prio like orig ProductContentWrapper)
-        if (thisLocaleString.isEmpty() && UtilValidate.isEmpty((String) contentMap.get(SolrLocaleUtil.I18N_GENERAL))) {
+        // special case: no locale string: treat as general
+        if (thisLocaleString.isEmpty()) { // 2017-11-24: this would actually have priority over entity field now:  && UtilValidate.isEmpty((String) contentMap.get(SolrLocaleUtil.I18N_GENERAL))
+            // NOTE: 2017-11-24: due to ContentWrapper changes, this case now has priority over the entity field for 
+            // the value of I18N_GENERAL
             GenericValue targetContent = content;
             Locale locale = defaultProductLocale;
             String res = getContentText(delegator, dispatcher, targetContent, product, productContent, locale, useCache);
             if (res.length() > 0) {
-                contentMap.put(SolrLocaleUtil.getLangCode(locale), res);
+                contentMap.put(SolrLocaleUtil.I18N_GENERAL, res);
+                // not needed anymore, because of ContentWrapper prio change and because
+                // refineLocalizedContentValues will copy it over anyway
+//                if (locale != null) {
+//                    contentMap.put(SolrLocaleUtil.getLangCode(locale), res);
+//                }
             }
         }
         for(Locale locale : locales) {
@@ -706,8 +712,7 @@ public abstract class SolrProductUtil {
             if (targetLocaleString.equalsIgnoreCase(thisLocaleString)) {
                 targetContent = content;
             } else {
-                // FIXME: useCache can't propagate here!
-                GenericValue altContent = ContentWorker.findAlternateLocaleContent(delegator, content, locale);
+                GenericValue altContent = ContentWorker.findAlternateLocaleContent(delegator, content, locale, null, useCache);
                 if (altContent != null && !contentId.equals(altContent.getString("contentId"))) {
                     targetContent = altContent;
                 }
@@ -727,7 +732,8 @@ public abstract class SolrProductUtil {
         Map<String, Object> inContext = new HashMap<>();
         inContext.put("product", product);
         inContext.put("productContent", productContent);
-        ContentWorker.renderContentAsText(dispatcher, delegator, targetContent, out, inContext, locale, "text/plain", useCache, null);
+        boolean deepCache = useCache; // SCIPIO: SPECIAL: only way to prevent all caching
+        ContentWorker.renderContentAsText(dispatcher, delegator, targetContent, out, inContext, locale, "text/plain", null, useCache, deepCache, null);
         return out.toString();
     }
     

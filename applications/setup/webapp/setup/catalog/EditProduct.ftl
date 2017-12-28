@@ -62,6 +62,7 @@
             </#list>
         </@field>
         
+        <@field type="input" name="productName" value=(params.productName!) label=uiLabelMap.ProductProductName class="+ect-inputfield" required=(formActionType != "edit")/><#--  not strictly: required=true -->
         <@field type="input" name="internalName" value=(params.internalName!) label=uiLabelMap.ProductInternalName class="+ect-inputfield" required=true/>
       </#if>
 
@@ -80,13 +81,62 @@
       </#if>
 
       <#if formActionType != "add">
-        <@field type="input" name="productName" value=(params.productName!) label=uiLabelMap.ProductProductName class="+ect-inputfield" tooltip=uiLabelMap.ProductNonLocalizedContentFieldInfo/><#--  not strictly: required=true -->
-        <@field type="input" name="description" value=(params.description!) label=uiLabelMap.FormFieldTitle_description class="+ect-inputfield" tooltip=uiLabelMap.ProductNonLocalizedContentFieldInfo/>
-        <@field type="input" name="longDescription" value=(params.longDescription!) label=uiLabelMap.FormFieldTitle_longDescription class="+ect-inputfield" tooltip=uiLabelMap.ProductNonLocalizedContentFieldInfo/>
+        <#-- WARNING: if the "add category" is ever rewritten as AJAX, this will need to be rewritten! -->
+        <@field type="select" label=uiLabelMap.ProductPrimaryCategory name="primaryProductCategoryId" class="+ect-inputfield">
+            <#local catFound = false>
+            <#local primaryCatId = rawString(params.primaryProductCategoryId!)>
+          <#local optMarkup>
+            <@field type="option" value=""></@field>
+            <#list (allStoreCategories![]) as option>
+                <#local selected = (rawString(option.productCategoryId) == primaryCatId)>
+                <#local catFound = catFound || selected>
+                <@field type="option" value=(option.productCategoryId) selected=selected><#if option.categoryName?has_content>${option.categoryName!} [${option.productCategoryId}]<#else>${option.productCategoryId}</#if></@field>
+            </#list>
+          </#local>
+            <#-- NOTE: no point looking up the category for its name, because JS cannot do this -->
+            <#if primaryCatId?has_content && !catFound>
+               <@field type="option" value=primaryCatId selected=selected>${primaryCatId}</@field>
+            </#if>
+            ${optMarkup}
+        </@field>
+      
+        <@field type="text" name="brandName" label=uiLabelMap.ProductBrandName value=(params.brandName!) maxlength="60" class="+ect-inputfield"/>
+        <@field type="textarea" label=uiLabelMap.CommonComments name="comments" class="+ect-inputfield">${params.comments!}</@field>
+        
+        <#-- FIXME?: I was forced to make these selects instead of checkboxes due to complication implementing JS filling for checkbox - issues there -->
+        <@field type="select" name="isVirtual" label=uiLabelMap.ProductVirtualProduct class="+ect-inputfield">
+            <@field type="option" value="N" selected=("Y" != params.isVirtual!)>N</@field>
+            <@field type="option" value="Y" selected=("Y" == params.isVirtual!)>Y</@field>
+        </@field>
+        <@field type="select" name="isVariant" label=uiLabelMap.ProductVariantProduct class="+ect-inputfield">
+            <@field type="option" value="N" selected=("Y" != params.isVariant!)>N</@field>
+            <@field type="option" value="Y" selected=("Y" == params.isVariant!)>Y</@field>
+        </@field>
 
-        <@fieldset title=uiLabelMap.CommonLocalizedFields collapsed=true class="+ect-locfields-cnt">
-            <@ectLocalizedFields objectType="product" params=params/>
+        <@field type="input" name="description" value=(params.description!) label=uiLabelMap.FormFieldTitle_description class="+ect-inputfield"/>
+        <@field type="textarea" name="longDescription" value=(params.longDescription!) label=uiLabelMap.FormFieldTitle_longDescription class="+ect-inputfield"/>
+
+        <#local updateLocalizedTextsChecked = (params.updateLocalizedTexts!?string == "true")>
+        <@fieldset title=uiLabelMap.CommonLocalizedFields collapsed=false class="+ect-locfields-cnt stc-locfields-cnt"><#-- fieldset too limited for this to work: collapsed=(!updateLocalizedTextsChecked) -->
+            <#-- auto-checks when user changes a field -->
+            <@field type="generic">
+                <@field type="checkbox" checkboxType="simple" name="updateLocalizedTexts" label=uiLabelMap.CommonUpdateLocalizedFields value="true" 
+                    checked=updateLocalizedTextsChecked class="+ect-nonvaluefield ect-checkfield ect-initial-unchecked"/>
+            </@field>
+            <@script>
+                jQuery(document).ready(function() {
+                    var form = jQuery('#${escapeVal(id, 'js')}');
+                    jQuery('.stc-locfields-cnt :input', form).change(function() {
+                        if (jQuery(this).prop('name') !== 'updateLocalizedTexts') {
+                            jQuery('input[name=updateLocalizedTexts]', form).prop('checked', true);
+                        }
+                    });
+                });
+            </@script>
+            <@catalogStcLocFields objectType="product" params=params/>
         </@fieldset>
+        
+        <@alert type="info">${uiLabelMap.SetupProductEditNotice} (<@setupExtAppLink uri="/catalog/control/EditProduct" text=uiLabelMap.ProductNewProduct/>)</@alert>
       </#if>
     </@form>
 </#macro>

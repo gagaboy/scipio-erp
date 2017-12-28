@@ -52,6 +52,7 @@ import org.ofbiz.entity.GenericValue;
 import org.ofbiz.entity.condition.EntityCondition;
 import org.ofbiz.entity.condition.EntityOperator;
 import org.ofbiz.entity.util.EntityQuery;
+import org.ofbiz.entity.util.EntityUtil;
 import org.ofbiz.product.catalog.CatalogWorker;
 import org.ofbiz.product.category.CatalogUrlFilter.CatalogAltUrlBuilder;
 import org.ofbiz.product.category.CatalogUrlServlet.CatalogUrlBuilder;
@@ -62,10 +63,9 @@ import org.ofbiz.product.product.ProductWorker;
 import org.ofbiz.service.LocalDispatcher;
 import org.ofbiz.webapp.website.WebSiteWorker;
 
+import com.ilscipio.scipio.ce.util.SeoStringUtil;
 import com.ilscipio.scipio.product.category.CatalogAltUrlSanitizer;
 import com.ilscipio.scipio.product.category.CatalogUrlType;
-import com.ilscipio.scipio.product.seo.SeoCatalogUrlWorker.SeoCatalogUrlInfo;
-import com.ilscipio.scipio.util.SeoStringUtil;
 
 /**
  * SCIPIO: SEO url building functions and callbacks.
@@ -499,8 +499,7 @@ public class SeoCatalogUrlWorker implements Serializable {
         String catName = null;
         String productCategoryId = productCategory.getString("productCategoryId");
         try {
-            // FIXME: ContentWrapper does not respect useCache flag!
-            String altUrl = CategoryContentWrapper.getProductCategoryContentAsText(productCategory, "ALTERNATIVE_URL", locale, dispatcher, "raw");
+            String altUrl = CategoryContentWrapper.getProductCategoryContentAsText(productCategory, "ALTERNATIVE_URL", locale, dispatcher, useCache, "raw");
             if (UtilValidate.isNotEmpty(altUrl)) {
                 // FIXME: effective locale might not be same as "locale" variable!
                 altUrl = getCatalogAltUrlSanitizer().sanitizeAltUrlFromDb(altUrl, locale, CatalogUrlType.CATEGORY);
@@ -817,8 +816,7 @@ public class SeoCatalogUrlWorker implements Serializable {
             
             // append product name
             String productId = product.getString("productId");
-            // FIXME: ContentWrapper does not respect useCache flag!
-            String alternativeUrl = ProductContentWrapper.getProductContentAsText(product, "ALTERNATIVE_URL", locale, dispatcher, "raw");
+            String alternativeUrl = ProductContentWrapper.getProductContentAsText(product, "ALTERNATIVE_URL", locale, dispatcher, useCache, "raw");
             // FIXME: effective locale might not be same as "locale" variable!
             alternativeUrl = getCatalogAltUrlSanitizer().sanitizeAltUrlFromDb(alternativeUrl, locale, CatalogUrlType.PRODUCT);
             if (UtilValidate.isNotEmpty(alternativeUrl)) {
@@ -1561,8 +1559,9 @@ public class SeoCatalogUrlWorker implements Serializable {
         if (matchTextIdCond != null) condList.add(matchTextIdCond);
         List<GenericValue> productContentInfos = EntityQuery.use(delegator).from("ProductContentAssocAndElecTextShort")
                 .where(condList).select("productId", "textData", "localeString")
-                .filterByDate(moment).filterByDate(moment, "caFromDate", "caThruDate")
+                .filterByDate(moment) // cannot do this, only one filter at a time (bug): .filterByDate(moment, "caFromDate", "caThruDate")
                 .orderBy("-fromDate", "-caFromDate").cache(true).queryList();
+        productContentInfos = EntityUtil.filterByDate(productContentInfos, moment, "caFromDate", "caThruDate", true);
         exactResult = findExtractAltUrlValueId(altUrl, productContentInfos, "productId", CatalogUrlType.PRODUCT, exactOnly, singleExactOnly, results);
         if (exactResult != null && exactResult.isExact()) {
             new AltUrlPartResults(results);
@@ -1646,8 +1645,9 @@ public class SeoCatalogUrlWorker implements Serializable {
         if (matchTextIdCond != null) condList.add(matchTextIdCond);
         List<GenericValue> productCategoryContentInfos = EntityQuery.use(delegator).from("ProductCategoryContentAssocAndElecTextShort")
                 .where(condList).select("productCategoryId", "textData", "localeString")
-                .filterByDate(moment).filterByDate(moment, "caFromDate", "caThruDate")
+                .filterByDate(moment) // cannot do this, only one filter at a time (bug): .filterByDate(moment, "caFromDate", "caThruDate")
                 .orderBy("-fromDate", "-caFromDate").cache(true).queryList();
+        productCategoryContentInfos = EntityUtil.filterByDate(productCategoryContentInfos, moment, "caFromDate", "caThruDate", true);
         exactResult = findExtractAltUrlValueId(altUrl, productCategoryContentInfos, "productCategoryId", CatalogUrlType.CATEGORY, exactOnly, singleExactOnly, results);
         if (exactResult != null && exactResult.isExact()) {
             return new AltUrlPartResults(results);

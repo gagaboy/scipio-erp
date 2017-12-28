@@ -22,6 +22,8 @@ import org.ofbiz.entity.util.EntityQuery;
 import org.ofbiz.entity.util.EntityUtil;
 import org.ofbiz.service.LocalDispatcher;
 
+import com.ilscipio.scipio.accounting.external.BaseOperationStats;
+import com.ilscipio.scipio.accounting.external.BaseOperationStats.Stat;
 import com.ilscipio.scipio.setup.ContactMechPurposeInfo.FacilityContactMechPurposeInfo;
 import com.ilscipio.scipio.setup.ContactMechPurposeInfo.PartyContactMechPurposeInfo;
 
@@ -263,6 +265,8 @@ public abstract class SetupDataUtil {
         String orgPartyId = (String) params.get("orgPartyId");
         String topGlAccountId = (String) params.get("topGlAccountId");
         
+        String tabId = (String) params.get("tabId");        
+        
         DynamicViewEntity dve = new DynamicViewEntity();
         dve.addMemberEntity("GAO", "GlAccountOrganization");
         dve.addMemberEntity("GA", "GlAccount");
@@ -335,8 +339,21 @@ public abstract class SetupDataUtil {
                     result.put("complete", true);
                 }
                 
+                if (params.containsKey("datevImportDataCategory")) {
+                    String datevImportDataCategory = (String) params.get("datevImportDataCategory");
+                    if (UtilValidate.isNotEmpty(datevImportDataCategory)) {
+                        if (params.containsKey("operationStats")) {
+                            BaseOperationStats operationStats = (BaseOperationStats) params.get("operationStats");
+                            for (Stat stat : operationStats.getStats()) {
+                                Debug.log("[" + stat.getScope().toString() + "][" + stat.getLevel().toString() + "]: " + stat.getMessage());
+                            }
+                        }
+                    }
+                }
+                
                 result.put("topGlAccountId", topGlAccountId);
                 result.put("topGlAccount", topGlAccount);
+                result.put("tabId", tabId);
             }
         }
 
@@ -613,10 +630,29 @@ public abstract class SetupDataUtil {
         GenericValue webSite = null;
         Map<String, Object> fields = UtilMisc.toMap("productStoreId", productStoreId);
         List<GenericValue> webSiteList = delegator.findByAnd("WebSite", fields, null, useCache);
-        webSite = getFirstMaxOneExpected(webSiteList, fields);
         if (!isNewOrFailedCreate) {
-            result.put("webSiteList", webSiteList);
+            String webSiteId = (String) params.get("webSiteId");
+            if (UtilValidate.isNotEmpty(webSiteId)) {
+                for(GenericValue ws : webSiteList) {
+                    if (webSiteId.equals(ws.getString("webSiteId"))) {
+                        webSite = ws;
+                        break;    
+                    }
+                }
+                if (webSite == null) {
+                    Debug.logError("Setup: Received webSiteId '" + webSiteId 
+                            + "' does not match any WebSite for productStoreId '" + productStoreId 
+                            + "' in system; ignoring and using default (if any)", module);
+                }
+            }
         }
+        // NOTE: this isn't fully accurate (for the bad webSiteId param case), but won't matter for now
+        if (webSite == null) webSite = getFirstMaxOneExpected(webSiteList, fields);
+        
+        // will need this always
+        //if (!isNewOrFailedCreate) {
+        result.put("webSiteList", webSiteList);
+        //}
         result.put("webSiteCount", webSiteList.size());
         
         if (webSite != null) {

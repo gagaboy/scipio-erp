@@ -38,22 +38,12 @@ if (isEventError == null) isEventError = context.isError;
 if (isEventError == null) isEventError = false;
 context.ectIsEventError = isEventError;
 
-objectLocalizedFields = context.ectObjectLocalizedFields;
-if (!objectLocalizedFields) {
-    objectLocalizedFields = [
-        category: [
-            fieldNames: ["categoryName", "description", "longDescription"],
-            typeNames: ["CATEGORY_NAME", "DESCRIPTION", "LONG_DESCRIPTION"],
-            typeNameListStr: '[CATEGORY_NAME, DESCRIPTION, LONG_DESCRIPTION]'
-        ],
-        product: [
-            fieldNames: ["productName", "description", "longDescription"],
-            typeNames: ["PRODUCT_NAME", "DESCRIPTION", "LONG_DESCRIPTION"],
-            typeNameListStr: '[PRODUCT_NAME, DESCRIPTION, LONG_DESCRIPTION]'
-        ] 
-    ];
+catalogLocFieldsInfo = context.catalogLocFieldsInfo;
+if (!catalogLocFieldsInfo) {
+    GroovyUtil.runScriptAtLocation("component://product/webapp/catalog/WEB-INF/actions/catalog/GetCatalogLocFieldsInfo.groovy", null, context);
+    catalogLocFieldsInfo = context.catalogLocFieldsInfo;
+    context.catalogLocFieldsInfo = catalogLocFieldsInfo;
 }
-context.ectObjectLocalizedFields = objectLocalizedFields;
 
 getSetStringParam = { paramName ->
     def value = context[paramName];
@@ -209,7 +199,22 @@ if (!targetNodeInfo.defined && !(!isEventError && eventStates.isDeleteRecord)) {
 treeMenuHelper = new JsTreeHelper();
 treeMenuData = [];
 
+// partial preloaded, partial ajax
+includeEntityData = context.ectIncludeEntityData;
+if (includeEntityData == null) {
+    includeEntityData = [
+        "prodCatalog":true, // NOTE: this one is not ajaxed because not worth it
+        "productStoreCatalog":["prodCatalogId", "productStoreId", "fromDate", "sequenceNum", "thruDate"] as Set,
+        "productCategory":false, // 2017-12-15: now looked up via ajax
+        "productCategoryRollup":["productCategoryId", "parentProductCategoryId", "fromDate", "sequenceNum", "thruDate"] as Set,
+        "prodCatalogCategory":["productCategoryId", "prodCatalogId", "fromDate", "sequenceNum", "thruDate", "prodCatalogCategoryTypeId"] as Set,
+        "product":false, // 2017-12-15: now looked up via ajax
+        "productCategoryMember":["productId", "productCategoryId", "fromDate", "sequenceNum", "thruDate", "quantity"] as Set
+    ];
+}
+
 productStoreCatalogs = context.productStoreCatalogList ?: [];
+allStoreCategoriesMap = new HashMap();
 for (productStoreCatalog in productStoreCatalogs) {    
     prodCatalog = productStoreCatalog.getRelatedOne("ProdCatalog", false);
     if (prodCatalog) {
@@ -234,25 +239,22 @@ for (productStoreCatalog in productStoreCatalogs) {
             "prodCatalogId" : prodCatalog.prodCatalogId,
             "state": state,
             "categoryStates": categoryStates,
-            "includeCategoryData": true,
-            "includeProductData": true,
+            "includeEntityData": includeEntityData,
+            "includeAllEntityData": false,
             "maxProductsPerCat": maxProductsPerCat,
             "includeEmptyTop": true,
-            "productStoreCatalog": productStoreCatalog
+            "productStoreCatalog": productStoreCatalog,
+            "categoryEntityOutMap": allStoreCategoriesMap
         ]);
         if (result?.treeList) {
             treeMenuData = treeMenuData + result.treeList;
+        }
+        if (result?.categoryEntityOutMap != null) {
+            allStoreCategoriesMap = result.categoryEntityOutMap;
         }
     }
 }
 
 treeMenuHelper.addAll(treeMenuData)
 context.treeMenuData = treeMenuHelper;
-
-// SPECIAL: method to convert the stringified localized field submitted parameters (contentField_),
-// so user input is not lost on event error
-// FIXME?: shouldn't run on every call, but doesn't matter yet
-if (parameters.simpleTextViewsByType == null) {
-    parameters.simpleTextViewsByType = org.ofbiz.product.category.CategoryWorker.parseLocalizedSimpleTextContentFieldParams(parameters, "contentField_", false);
-}
-if (DEBUG) Debug.logInfo("parsed parameters.simpleTextViewsByType: " + parameters.simpleTextViewsByType, module);
+context.allStoreCategoriesMap = allStoreCategoriesMap;

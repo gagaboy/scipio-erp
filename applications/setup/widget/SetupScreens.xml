@@ -596,12 +596,39 @@
                                         <!-- don't show tree until at least one topGlAccountId created -->
                                         <not><if-empty field="topGlAccountId"/></not>
                                     </condition>
-                                    <widgets>
+                                    <widgets>                                    	
                                         <screenlet>
-                                        	<include-screen name="EditAcctgPreferences"/>
-                                            <include-screen name="EditGLAccountTree"/>
-                                            <include-screen name="EditFiscalPeriods"/>
-                                            <include-screen name="EditJournals"/>
+                                        	<platform-specific><html><html-template><![CDATA[                                                
+	                                        	<@tabs id="accountingTabs">
+	                                        		<@tab id="preferencesTab" title="Preferences"><@render type="screen" resource="component://setup/widget/SetupScreens.xml" name="EditAcctgPreferences"/></@tab>
+	                                        		<@tab id="glAccountsTab" title="Configure GL Accounts">
+	                                        			<@render type="screen" resource="component://setup/widget/SetupScreens.xml" name="EditGLAccountTree" />
+	                                        		</@tab>
+	                                        		<@tab id="fiscalPeriodsTab" title="Configure Fiscal Periods"><@render type="screen" resource="component://setup/widget/SetupScreens.xml" name="EditFiscalPeriods"/></@tab>
+	                                        		<@tab id="accountingTransactionsTab" title="Configure Accounting Transactions"><@render type="screen" resource="component://setup/widget/SetupScreens.xml" name="EditAccountingTransactions"/></@tab>
+	                                        		<@tab id="journalTab" title="Configure Journal"><@render type="screen" resource="component://setup/widget/SetupScreens.xml" name="EditJournals"/></@tab>
+	                                        	</@tabs>
+                                                <#if accountingData.tabId?has_content>
+                                                    <@script>
+                                                    	jQuery(document).ready(function() {   
+                                                            console.log("TAB ID ====> ${accountingData.tabId}");                                                        
+                                                            try {
+                                                                jQuery("#${accountingData.tabId}").tab('show');
+                                                            } catch (err) {
+                                                                console.log("err 1 ===> " + err);
+                                                                try {
+                                                                    jQuery("#${accountingData.tabId}").on('toggled', function(event, tab) {
+                                                                        jQuery(tab).trigger('click');
+                                                                        console.log("tab =======> " + tab);
+                                                                    });
+                                                                } catch (err) {
+                                                                    console.log("err 2 ===> " + err);
+                                                                }
+                                                            }
+                                                        });
+                                                    </@script>
+                                                </#if>
+                                        	]]></html-template></html></platform-specific>
                                         </screenlet>
                                     </widgets>
                                     <fail-widgets>
@@ -640,13 +667,9 @@
                 <script location="component://setup/webapp/setup/WEB-INF/actions/accounting/EditAcctgPreferences.groovy"/>                
             </actions>
             <widgets>
-            	<section>
-		            <widgets>
-						<screenlet>
-							<platform-specific><html><html-template location="component://setup/webapp/setup/accounting/EditAcctgPreferences.ftl"/></html></platform-specific>
-						</screenlet>
-		            </widgets>
-            	</section>
+				<screenlet>
+					<platform-specific><html><html-template location="component://setup/webapp/setup/accounting/EditAcctgPreferences.ftl"/></html></platform-specific>
+				</screenlet>		          
             </widgets>           
         </section>
     </screen>
@@ -655,7 +678,7 @@
             <actions>
                 <script location="component://setup/webapp/setup/WEB-INF/actions/accounting/EditGLAccountTree.groovy"/>                
             </actions>
-            <widgets>
+            <widgets>            
             	<section>
             		 <condition>
 		                <and>
@@ -667,7 +690,7 @@
 						<screenlet>
 							<platform-specific><html><html-template location="component://setup/webapp/setup/accounting/EditGLAccountTree.ftl"/></html></platform-specific>
 						</screenlet>
-		            </widgets>
+					</widgets>						
             	</section>
             </widgets>           
         </section>
@@ -678,9 +701,7 @@
             </actions>
             <widgets>
                 <!--<include-form name="EditProdCatalog" location="component://setup/widget/SetupForms.xml"/>-->
-                <platform-specific>
-                    <html><html-template location="component://setup/webapp/setup/accounting/EditGLAccount.ftl"/></html>
-                </platform-specific>
+                <platform-specific><html><html-template location="component://setup/webapp/setup/accounting/EditGLAccount.ftl"/></html></platform-specific>
             </widgets>
         </section>
     </screen>
@@ -690,13 +711,7 @@
                 <script location="component://setup/webapp/setup/WEB-INF/actions/accounting/EditFiscalPeriods.groovy"/>                
             </actions>
             <widgets>
-            	<section>
-		            <widgets>
-						<screenlet>
-							<platform-specific><html><html-template location="component://setup/webapp/setup/accounting/EditFiscalPeriods.ftl"/></html></platform-specific>
-						</screenlet>
-		            </widgets>
-            	</section>
+            	<platform-specific><html><html-template location="component://setup/webapp/setup/accounting/EditFiscalPeriods.ftl"/></html></platform-specific>
             </widgets>           
         </section>
     </screen>
@@ -716,7 +731,22 @@
             </widgets>           
         </section>
     </screen>
-    
+    <screen name="EditAccountingTransactions">
+        <section>
+            <actions>
+                <!-- <script location="component://setup/webapp/setup/WEB-INF/actions/accounting/EditJournals.groovy"/>      -->           
+            </actions>
+            <widgets>
+            	<section>
+		            <widgets>
+						<screenlet>
+							<platform-specific><html><html-template location="component://setup/webapp/setup/accounting/EditAccountingTransactions.ftl"/></html></platform-specific>
+						</screenlet>
+		            </widgets>
+            	</section>
+            </widgets>           
+        </section>
+    </screen>
     
     <screen name="SetupFacility">
         <section>
@@ -793,7 +823,8 @@
                 <set field="setupCatalogForms.location" value="component://setup/widget/SetupScreens.xml"/>
                 <set field="setupCatalogForms.name" value="SetupCatalogForms"/>
                 
-                <set field="layoutSettings.javaScripts[]" value="/catalog/static/ScpEctCommon.js" global="true"/>
+                <set field="layoutSettings.javaScripts[]" value="/content/images/ScpContentCommon.js" global="true"/>
+                <set field="layoutSettings.javaScripts[]" value="/catalog/static/ScpCatalogCommon.js" global="true"/>
             </actions>
             <widgets>
                 <decorator-screen name="CommonSetupWizardDecorator" location="${parameters.mainDecoratorLocation}">
@@ -966,6 +997,19 @@
                                     <platform-specific>
                                         <html><html-template location="component://setup/webapp/setup/store/EditProductStore.ftl"/></html>
                                     </platform-specific>
+                                    <section>
+                                        <condition>
+                                            <and>
+                                                <not><if-empty field="webSiteCount"/></not>
+                                                <if-compare field="webSiteCount" operator="greater" value="1"/>
+                                            </and>
+                                        </condition>
+                                        <widgets>
+                                            <platform-specific>
+                                                <html><html-template location="component://setup/webapp/setup/store/ListWebSites.ftl"/></html>
+                                            </platform-specific>
+                                        </widgets>
+                                    </section>
                                 </screenlet>
                             </widgets>
                             <fail-widgets>

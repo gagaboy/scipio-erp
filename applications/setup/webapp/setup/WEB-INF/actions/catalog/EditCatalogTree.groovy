@@ -29,3 +29,14 @@ context.ectIsEventError = context.isSetupEventError;
 
 // CORE DATA PREP
 GroovyUtil.runScriptAtLocation("component://product/webapp/catalog/WEB-INF/actions/catalog/tree/EditCatalogTreeCore.groovy", null, context);
+
+// SPECIAL: all categories list needed for dropdowns and such - primaryProductCategoryId (and/or other) fields,
+// here must sort it
+context.allStoreCategories = EntityUtil.orderBy(context.allStoreCategoriesMap?.values(), ["categoryName", "productCategoryId"]);
+
+
+
+
+
+
+

@@ -25,7 +25,7 @@
     <include location="component://commonext/webapp/WEB-INF/controller.xml"/>
     <include location="component://party/webapp/partymgr/WEB-INF/controller.xml"/>-->
     <include location="component://commonext/webapp/ofbizsetup/WEB-INF/controller.xml"/>
-    <description>SCIPIO-ERP Setup component controller</description>
+    <description>SCIPIO ERP Setup component controller</description>
     
     <!-- SCIPIO: NOTE: setup events will keep pointing to the original script locations (ofbizsetup, commonext) unless they
         diverge significantly, because they contain significant code that should not be moved. -->
@@ -187,6 +187,19 @@
         <security https="true" auth="true"/>
         <event type="service" invoke="setupUpdatePartyAcctgPreference"/>
         <response name="success" type="request" value="nextSetupStep"/>
+        <response name="error" type="request" value="setupAccounting"/>
+    </request-map>
+    <request-map uri="setupImportDatevDataCategory">
+        <security https="true" auth="true"/>
+        <event type="simple" path="component://accounting/script/com/ilscipio/scipio/accounting/datev/DatevEvents.xml" invoke="importDatevDataCategory"/>                                              
+        <!-- <event type="service" invoke="importDatevTransactionEntries"/> -->
+        <response name="success" type="view" value="SetupAccounting"/>
+        <response name="error" type="request" value="setupAccounting"/>
+    </request-map>
+    <request-map uri="setupExportDatevDataCategory">
+        <security https="true" auth="true"/>
+        <event type="simple" path="component://accounting/script/com/ilscipio/scipio/accounting/datev/DatevEvents.xml" invoke="exportDatevDataCategory"/>
+        <response name="success" type="view" value="SetupAccounting"/>
         <response name="error" type="request" value="setupAccounting"/>
     </request-map>
     
