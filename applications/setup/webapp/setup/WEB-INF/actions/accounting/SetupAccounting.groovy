@@ -1,11 +1,11 @@
-import org.apache.commons.lang.StringUtils;
 import org.ofbiz.base.util.*;
 import org.ofbiz.entity.util.*;
 
 import com.ilscipio.scipio.setup.*;
 
-final module = "SetupAccounting.groovy";
+import javolution.util.FastMap
 
+final module = "SetupAccounting.groovy";
 
 SetupWorker setupWorker = context.setupWorker;
 setupStep = context.setupStep;
@@ -58,6 +58,28 @@ context.topGlAccountId = topGlAccountId;
 topGlAccount = delegator.findOne("GlAccount", [glAccountId: topGlAccountId], false);
 context.topGlAccount = topGlAccount;
 
+/*
+ * AcctgTransType & AcctgTransEntryType
+ */
+acctgTransTypes = EntityQuery.use(delegator).from("AcctgTransType").queryList();
+context.acctgTransTypes = acctgTransTypes;
+acctgTransEntryTypes = EntityQuery.use(delegator).from("AcctgTransEntryType").queryList();
+context.acctgTransEntryTypes = acctgTransEntryTypes;
+
+/*
+ * Scipio store urls - Accounting addons
+ */
+Properties generalProps = UtilProperties.getProperties("general");
+Map<String, String> scipioAcctgStandardAddons = FastMap.newInstance();
+for (String key in generalProps.stringPropertyNames()) {
+    if (key.startsWith("scipio.store.addon.accounting")) {
+        scipioAcctgStandardAddons.put(key.substring(key.lastIndexOf(".") + 1, key.length()), UtilProperties.getPropertyValue("general", "scipio.store.base.url") + generalProps.get(key));
+    }
+}
+context.scipioAcctgStandardAddons = scipioAcctgStandardAddons; 
+for (String key in scipioAcctgStandardAddons.keySet()) {
+    Debug.log("[" + key + "]: " + scipioAcctgStandardAddons.get(key));
+}
 
 
 /*
@@ -86,7 +108,9 @@ context.glAccountTypes = EntityQuery.use(delegator).from("GlAccountType").orderB
 context.glAccountClasses = EntityQuery.use(delegator).from("GlAccountClass").orderBy("description").queryList();
 context.glResourceTypes = EntityQuery.use(delegator).from("GlResourceType").orderBy("description").queryList();
 
-// true if explicit newGlAccount=Y flag OR failed create
+context.periodTypes = EntityQuery.use(delegator).from("PeriodType").orderBy("description").queryList();
 
-glSelected = topGlAccount || setupWorker?.isEffectiveNewRecordRequest(StringUtils.capitalize("GlAccount"));
-context.glSelected = glSelected;
+
+// true if explicit newGlAccount=Y flag OR failed create
+//glSelected = topGlAccount || setupWorker?.isEffectiveNewRecordRequest(StringUtils.capitalize("GlAccount"));
+//context.glSelected = glSelected;

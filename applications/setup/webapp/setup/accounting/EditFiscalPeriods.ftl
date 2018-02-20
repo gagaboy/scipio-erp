@@ -1,34 +1,68 @@
 <#-- SCIPIO: SETUP fiscal periods implementation -->
 
 <#include "component://setup/webapp/setup/common/common.ftl">
+<#include "component://accounting/webapp/accounting/ledger/tree/treecommon.ftl">
 
-<#assign defaultParams = {	
+<@script>
+    function setupShowFormActivatedCallback(form, ai) {
+        setupControlMenu.setSubmitFormId(form.prop('id'));
+    };
+</@script>
+
+<#assign efpCallbacks = {
+    "showFormActivated": wrapRawScript("setupShowFormActivatedCallback")
+}>
+<#assign efpAllHideShowFormIds = [
+    "acctg-newtimeperiod", "acctg-edittimeperiod"
+]>
+<#assign efpActionProps = {
+	"default": {
+        "newtimeperiod": {
+            "type": "form",
+            "mode": "show",
+            "id": "acctg-newtimeperiod",
+            "defaultParams": wrapRawScript("function() { return defaultGlAccountParams; }")
+        }
+    }, 
+	"timePeriod": {   
+	    "add": {
+	        "type": "form",
+	        "mode": "show",
+	        "id": "acctg-newtimeperiod"
+	    },
+	    "edit": {
+	    	"type": "form",
+	        "mode": "show",
+	        "id": "acctg-edittimeperiod"	        
+	    },
+	    "remove": {
+	    	"type": "form",
+            "mode": "submit",
+            "confirmMsg": rawLabel('CommonConfirmDeleteRecordPermanent'),
+            "id": "acctg-removetimeperiod-form"
+	    },
+	    "manage": {
+            "type": "link",
+            "target": "_blank",
+            "url": makeOfbizInterWebappUrl({"uri":'/accounting/control/EditCustomTimePeriod', "extLoginKey":true}),
+            "paramNames": {"customTimePeriodId": true }            
+        }
+    }
 }>
 
-<#assign paramMaps = getWizardFormFieldValueMaps({
-    "record":true, <#-- NOTE: must fallback with boolean true -->
-    "defaults":defaultParams,
-    "strictRecord":true <#-- TODO: REMOVE (debugging) -->
-})>
-<#assign params = paramMaps.values>
-<#assign fixedParams = paramMaps.fixedValues>
+<#-- RENDERS SETUP FORMS -->
+<#macro efpPostTreeArea extraArgs...>
+    <@render type="screen" resource=setupTimePeriodForms.location name=setupTimePeriodForms.name/>    
+</#macro>
 
-	
-	<@section title=uiLabelMap.AccountingTimePeriod>		
-		<@form method="get" action=makeOfbizUrl("setupAccounting") id="setupAccounting-selectTimePeriod-form">
-		    <#-- TODO: REVIEW: may make a difference later -->
-		    <@defaultWizardFormFields exclude=["topGlAccountId"]/>
-		    <#--<@field type="hidden" name="setupContinue" value="N"/> not needed yet-->
-		    
-		    <@field type="general" label=uiLabelMap.SetupAccountingSelectTimePeriod>
-		       <@field type="select" name="customTimePeriodId" id="setupAccounting-selectTimePeriod-select" class="+setupAccounting-selectTimePeriod-select" inline=true style="display:inline-block;">
-		            <option value="">[${uiLabelMap.SetupAccountingCreateNewTimePeriod}]</option>
-		            <option value="" disabled="disabled"></option>
-		              <#list timePeriods as timePeriod>
-		              	<#assign selected = (rawString(timePeriod.customTimePeriodId) == rawString(params.customTimePeriod!))>
-		                <option value="${timePeriod.customTimePeriodId!}"<#if selected> selected="selected"</#if>>${timePeriod.periodName!} [${timePeriod.customTimePeriodId!}]</option>
-		              </#list>
-		        </@field>
-		    </@field>
-		</@form>
-	</@section>		
+<#-- RENDERS DISPLAY OPTIONS -->
+<#macro efpExtrasArea extraArgs...>
+  <@section><#-- title=uiLabelMap.CommonDisplayOptions -->
+    <@form action=makeOfbizUrl("setupAccounting") method="get">
+      <@defaultWizardFormFields/>
+    </@form>
+  </@section>
+</#macro>
+
+<#-- CORE INCLUDE -->
+<#include "component://accounting/webapp/accounting/period/tree/EditCustomTimePeriodCore.ftl">		

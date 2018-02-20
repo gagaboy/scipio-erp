@@ -3,7 +3,6 @@ package com.ilscipio.scipio.solr;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.MalformedURLException;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -27,21 +26,17 @@ import org.apache.solr.client.solrj.response.SpellCheckResponse.Collation;
 import org.apache.solr.client.solrj.response.SpellCheckResponse.Suggestion;
 import org.apache.solr.common.SolrInputDocument;
 import org.ofbiz.base.util.Debug;
-import org.ofbiz.base.util.GeneralException;
 import org.ofbiz.base.util.UtilGenerics;
 import org.ofbiz.base.util.UtilMisc;
 import org.ofbiz.base.util.UtilProperties;
 import org.ofbiz.base.util.UtilValidate;
 import org.ofbiz.entity.Delegator;
 import org.ofbiz.entity.GenericDelegator;
-import org.ofbiz.entity.GenericEntity;
-import org.ofbiz.entity.GenericEntityException;
 import org.ofbiz.entity.GenericValue;
 import org.ofbiz.entity.transaction.TransactionUtil;
 import org.ofbiz.entity.util.EntityFindOptions;
 import org.ofbiz.entity.util.EntityListIterator;
 import org.ofbiz.service.DispatchContext;
-import org.ofbiz.service.GenericServiceException;
 import org.ofbiz.service.LocalDispatcher;
 import org.ofbiz.service.ModelService;
 import org.ofbiz.service.ServiceSyncRegistrations;
@@ -187,7 +182,7 @@ public abstract class SolrProductSearch {
             boolean markDirtyNoWebappCheck = UtilProperties.getPropertyAsBoolean(SolrUtil.solrConfigName, "solr.eca.markDirty.noWebappCheck", false);
             if (!(markDirtyNoWebappCheck && skippedDueToWebappInit)) {
                 if (Debug.verboseOn()) Debug.logVerbose("Solr: updateToSolr: Did not update index for product; marking SOLR data as dirty (old)", module);
-                SolrUtil.setSolrDataStatusId(dctx.getDelegator(), "SOLR_DATA_OLD", false);
+                SolrUtil.setSolrDataStatusIdSepTxSafe(dctx.getDelegator(), "SOLR_DATA_OLD", false);
             }
         }
         
@@ -196,6 +191,20 @@ public abstract class SolrProductSearch {
     
     private static Map<String, Object> updateToSolrCore(DispatchContext dctx, Map<String, Object> context, Boolean forceAdd, String productId, Map<String, Object> productInst) {
         Map<String, Object> result;
+        
+        // SPECIAL: 2018-01-03: do not update to Solr if the current transaction marked as rollback,
+        // because the rollbacked data may be (even likely to be) product data that we don't want in index
+        // FIXME?: this cannot handle transaction rollbacks triggered after us! Some client diligence still needed for that...
+        try {
+            if (TransactionUtil.isTransactionInPlace() && TransactionUtil.getStatus() == TransactionUtil.STATUS_MARKED_ROLLBACK) {
+                Debug.logWarning("Solr: updateToSolr: Current transaction is marked for rollback; aborting solr index update", module);
+                return ServiceUtil.returnFailure("Current transaction is marked for rollback; aborting solr index update");
+            }
+        } catch (Exception e) {
+            Debug.logError("Solr: updateToSolr: Failed to check transaction status; aborting solr index update: " + e.getMessage(), module);
+            return ServiceUtil.returnError("Failed to check transaction status; aborting solr index update");
+        }
+            
         if (Boolean.FALSE.equals(forceAdd)) {
             result = removeFromSolrCore(dctx, context, productId);
         } else {
@@ -1041,6 +1050,7 @@ public abstract class SolrProductSearch {
         if (clearAndUseCache == null) clearAndUseCache = rebuildClearAndUseCacheDefault;
         
         int numDocs = 0;
+        int numDocsIndexed = 0; // 2018-02: needed for accurate stats in case a client edit filters out products within loop
         EntityListIterator prodIt = null;
         try {
             Debug.logInfo("Solr: rebuildSolrIndex: Clearing solr index", module);
@@ -1093,6 +1103,7 @@ public abstract class SolrProductSearch {
                     if (product != null) {
                         Map<String, Object> dispatchContext = SolrProductUtil.getProductContent(product, dctx, productContext);
                         solrDocs.add(dispatchContext);
+                        numDocsIndexed++;
                         numLeft--;
                     } else {
                         lastReached = true;
@@ -1121,8 +1132,8 @@ public abstract class SolrProductSearch {
             }
             
             if (result == null) {
-                Debug.logInfo("Solr: rebuildSolrIndex: Finished with " + numDocs + " documents indexed", module);
-                final String statusMsg = "Cleared solr index and reindexed " + numDocs + " documents";
+                Debug.logInfo("Solr: rebuildSolrIndex: Finished with " + numDocsIndexed + " documents indexed", module);
+                final String statusMsg = "Cleared solr index and reindexed " + numDocsIndexed + " documents";
                 result = ServiceUtil.returnSuccess(statusMsg);
             }
         } catch (SolrServerException e) {
@@ -1156,8 +1167,18 @@ public abstract class SolrProductSearch {
         
         // If success, mark data as good
         if (ServiceUtil.isSuccess(result)) {
-            SolrUtil.setSolrDataStatusId(delegator, "SOLR_DATA_OK", true);
-        }
+            // TODO?: REVIEW?: 2018-01-03: for this method, for now, unlike updateToSolr,
+            // we will leave the status update in the same transaction as parent service,
+            // because it is technically possible that there was an error in the parent transaction
+            // prior to this service call that modified product data, or a transaction snafu
+            // that causes a modification in the product data being indexed to be rolled back,
+            // and in that case we don't want to mark the data as OK because another reindex
+            // will be needed as soon as possible.
+            // NOTE: in such case, we should even explicitly mark data as dirty, but I'm not
+            // certain we can do that reliably from here.
+            //SolrUtil.setSolrDataStatusIdSepTxSafe(delegator, "SOLR_DATA_OK", true);
+            SolrUtil.setSolrDataStatusIdSafe(delegator, "SOLR_DATA_OK", true);
+        }   
         result.put("numDocs", numDocs);
         result.put("executed", Boolean.TRUE);
         
@@ -1262,14 +1283,12 @@ public abstract class SolrProductSearch {
     public static Map<String, Object> setSolrDataStatus(DispatchContext dctx, Map<String, Object> context) {
         Map<String, Object> result;
         GenericDelegator delegator = (GenericDelegator) dctx.getDelegator();
-        
-        boolean success = SolrUtil.setSolrDataStatusId(delegator, (String) context.get("dataStatusId"), false);
-        if (success) {
+        try {
+            SolrUtil.setSolrDataStatusId(delegator, (String) context.get("dataStatusId"), false);
             result = ServiceUtil.returnSuccess();
-        } else {
-            result = ServiceUtil.returnError("Unable to set SOLR data status");
+        } catch (Exception e) {
+            result = ServiceUtil.returnError("Unable to set SOLR data status: " + e.getMessage());
         }
-        
         return result;
     }
     

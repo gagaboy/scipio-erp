@@ -232,7 +232,7 @@ NOTE (2016-08-30): The special token values {{{_EMPTY_VALUE_}}} and {{{_NO_VALUE
     hour1="" hour2="" timeMinutesName="" minutes="" isTwelveHour="" ampmName="" amSelected="" pmSelected="" compositeType="" formName="" 
     alert=false mask="" events={} step="" timeValues="" tooltip="" postfix="" postfixColumns="" inlinePostfix=false manualInput=true collapse=false fieldTitleBlank=false origLabel="" inlineLabel=false 
     required=false origArgs={} passArgs={} catchArgs...>
-    <#local class = addClassArg(class, styles.field_datetime_default!"")>
+  <#local class = addClassArg(class, styles.field_datetime_default!"")>
   <#-- NOTE: dateType and dateDisplayType (previously shortDateInput) are distinct and both are necessary. 
       dateType controls the type of data sent to the server; dateDisplayType only controls what's displayed to user. 
       (dateType=="date") is not the same as (dateDisplayType=="date" && dateType=="timestamp"). -->  
@@ -276,6 +276,12 @@ NOTE (2016-08-30): The special token values {{{_EMPTY_VALUE_}}} and {{{_NO_VALUE
         <#if title?is_boolean && title == true>
           <#local title = "">
         </#if>
+        <#-- 2018-02-16: title/tooltip can now start with "+" to indicate prepend to default -->
+        <#local titlePrefix = "">
+        <#if rawString(title)?starts_with("+")>
+          <#local titlePrefix = rawString(title)[1..]>
+          <#local title = "">
+        </#if>
         <#if !title?has_content>
           <#local title = styles.field_datetime_default_title!>
         </#if>
@@ -297,6 +303,13 @@ NOTE (2016-08-30): The special token values {{{_EMPTY_VALUE_}}} and {{{_NO_VALUE
             </#if>
           <#else>
             <#local title = getTextLabelFromExpr(title, {"dateLabel":origLabel, "dateFormatString":dateFormatString})!"">
+          </#if>
+        </#if>
+        <#if titlePrefix?has_content>
+          <#if title?has_content>
+            <#local title = titlePrefix + (styles.field_datetime_title_sep!" - ") + title>
+          <#else>
+            <#local title = titlePrefix>
           </#if>
         </#if>
       </#if>
@@ -1872,6 +1885,74 @@ NOTE (2016-08-30): The special token values {{{_EMPTY_VALUE_}}} and {{{_NO_VALUE
       ${escapeVal(text, 'htmlmarkup')}<#t/>
     <#else>
       <#nested><#t/>
+    </#if>
+  <#if hasWrapper>
+    </div><#lt/>
+  </#if>
+</#macro>
+
+<#assign field_inputgeneric_widget_defaultArgs = {
+  "type":"", "name":"","text":"", "class":"", "id":"", "style":"", "title":"", "tooltip":"", "inlineLabel":false, "required":false,
+  "placeholder":"","clientAutocomplete":true,"disabled":false, "readonly":false, "alert":"", "value":"", "textSize":"", "maxlength":"", "passArgs":{}
+}>
+<#macro field_inputgeneric_widget args={} inlineArgs...>
+  <#local args = mergeArgMaps(args, inlineArgs, scipioStdTmplLib.field_inputgeneric_widget_defaultArgs)>
+  <#local dummy = localsPutAll(args)>
+  <#local origArgs = args>
+  <#if !clientAutocomplete?is_boolean>
+    <#if clientAutocomplete?has_content>
+      <#local clientAutocomplete = clientAutocomplete?boolean>
+    <#else>
+      <#local clientAutocomplete = true>
+    </#if>
+  </#if>
+  <@field_inputgeneric_markup_widget type=type name=name text=text class=class id=id style=style title=title tooltip=tooltip inlineLabel=inlineLabel 
+    required=required alert=alert value=value textSize=textSize maxlength=maxlength disabled=disabled readonly=readonly placeholder=placeholder
+    clientAutocomplete=clientAutocomplete origArgs=origArgs passArgs=passArgs><#nested></@field_inputgeneric_markup_widget>
+</#macro>
+
+<#-- field markup - theme override -->
+<#macro field_inputgeneric_markup_widget type="" text="" class="" id="" style="" tooltip="" title="" 
+    value="" textSize="" maxlength="" name="" placeholder="" disabled=false readonly=false
+    clientAutocomplete=true inlineLabel=false required=false alert=false origArgs={} passArgs={} catchArgs...>
+  <#local attribs = {}>
+  <#local class = addClassArg(class, styles.field_inputgeneric_default!"")>
+  <#if tooltip?has_content>
+    <#local class = addClassArg(class, styles.field_inputgeneric_tooltip!styles.field_default_tooltip!"")>
+    <#local title = tooltip>
+    <#local attribs = attribs + styles.field_inputgeneric_tooltip_attribs!styles.field_default_tooltip_attribs!{}>
+  </#if>
+  <#local classes = compileClassArg(class)>
+  <#local hasWrapper = (title?has_content || classes?has_content || id?has_content)>
+  <#if hasWrapper>
+    <div<#if id?has_content && !type?has_content> id="${escapeVal(id, 'html')}"</#if><#if classes?has_content> class="${escapeVal(classes, 'html')}"</#if><#if title?has_content> title="${escapeVal(title, 'html')}"</#if><#if style?has_content> style="${escapeVal(style, 'html')}"</#if>><#rt/>
+  </#if>
+    <#if text?has_content>
+      ${escapeVal(text, 'htmlmarkup')}<#t/>
+    <#else>
+      <#nested><#t/>
+    </#if>
+    <#if type?has_content>
+        <#if "color" != type>
+            <#local class = addClassArg(class, styles.field_input_default!"")>
+        </#if>
+        <input type="${escapeVal(type, 'html')}" name="${escapeVal(name, 'html')}"<#t/>
+            <#if id?has_content> id="${escapeVal(id, 'html')}"</#if>
+            <@fieldElemAttribStr attribs=attribs /><#t/>
+            <#if title?has_content> title="${escapeVal(title, 'html')}"</#if><#t/>
+            <@fieldClassAttribStr class=class alert=alert /><#t/>
+            <#if value?has_content> value="${escapeVal(value, 'html')}"</#if><#t/>
+            <#if textSize?has_content> size="${textSize}"</#if><#t/>
+            <#if maxlength?has_content> maxlength="${maxlength}"</#if><#t/>
+            <#if disabled> disabled="disabled"</#if><#t/>
+            <#if readonly> readonly="readonly"</#if><#t/>
+            <#if id?has_content> id="${escapeVal(id, 'html')}"</#if><#t/>
+            <#if events?has_content><@commonElemEventAttribStr events=events /></#if><#t/>
+            <#if !clientAutocomplete> autocomplete="off"</#if><#t/>
+            <#if style?has_content> style="${escapeVal(style, 'html')}"</#if><#t/>
+            <#if placeholder?has_content> placeholder="${escapeVal(placeholder, 'html')}"</#if><#t/>
+            <#if required> required="required"</#if><#t/>
+          /><#t/>
     </#if>
   <#if hasWrapper>
     </div><#lt/>

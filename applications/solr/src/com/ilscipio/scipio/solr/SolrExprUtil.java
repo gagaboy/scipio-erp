@@ -2,15 +2,19 @@ package com.ilscipio.scipio.solr;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.solr.client.solrj.util.ClientUtils;
+import org.ofbiz.base.util.UtilMisc;
 import org.ofbiz.base.util.UtilValidate;
 
 /**
@@ -30,35 +34,58 @@ public abstract class SolrExprUtil {
 
     public static final String module = SolrExprUtil.class.getName();
     
+    // TODO: REVIEW: the "!" standalone character appears not recognized in solr 5 query parser;
+    // it only works if space after is removed. but it shouldn't do any harm here so leaving in...
+    static final Set<String> noPrefixTerms = UtilMisc.unmodifiableHashSet("AND", "OR", "NOT", "&&", "||", "!", "/*");
+    static final Set<Character> noPrefixTermCharPrefixes = UtilMisc.unmodifiableHashSet('+', '-');
+    static final Map<Character, Character> termEnclosingCharMap; 
+    static {
+        Map<Character, Character> map = new HashMap<>();
+        map.put('"', '"');
+        map.put('{', '}');
+        map.put('[', ']');
+        map.put('(', ')');
+        termEnclosingCharMap = Collections.unmodifiableMap(map);
+    }
+    
+    static final Pattern solrFieldNameAllowedChars = Pattern.compile("[a-zA-Z0-9_-]");
+    static final Pattern solrFieldNamePrefixExpr = Pattern.compile("^([a-zA-Z0-9_-]+:)(.*)$");
+
     protected SolrExprUtil() {
     }
 
     /**
-         * Escapes all special solr/query characters in the given query term
-         * <em>not</em> enclosed in quotes (single term).
-         * At current time, this includes at least: 
-         * <code>+ - && || ! ( ) { } [ ] ^ " ~ * ? : \ /</code> and whitespace.
-         * NOTE: The result should NOT be enclosed in quotes; use {@link SolrUtil#escapeTermForQuote} for that.
-         * FIXME?: whitespace escaping appears to not always be honored by solr parser?...
-         * @see SolrUtil#escapeTermForQuote
-         */
-        public static String escapeTermPlain(String term) {
-            return ClientUtils.escapeQueryChars(term);
-            // Reference implementation:
-    //        StringBuilder sb = new StringBuilder();
-    //        for (int i = 0; i < s.length(); i++) {
-    //          char c = s.charAt(i);
-    //          // These characters are part of the query syntax and must be escaped
-    //          if (c == '\\' || c == '+' || c == '-' || c == '!'  || c == '(' || c == ')' || c == ':'
-    //            || c == '^' || c == '[' || c == ']' || c == '\"' || c == '{' || c == '}' || c == '~'
-    //            || c == '*' || c == '?' || c == '|' || c == '&'  || c == ';' || c == '/'
-    //            || Character.isWhitespace(c)) {
-    //            sb.append('\\');
-    //          }
-    //          sb.append(c);
-    //        }
-    //        return sb.toString();
-        }
+     * Escapes all special solr/query characters in the given query term
+     * <em>not</em> enclosed in quotes (single term).
+     * At current time, this includes at least: 
+     * <code>+ - && || ! ( ) { } [ ] ^ " ~ * ? : \ /</code> and whitespace.
+     * NOTE: The result should NOT be enclosed in quotes; use {@link SolrUtil#escapeTermForQuote} for that.
+     * FIXME?: whitespace escaping appears to not always be honored by solr parser?...
+     * @see SolrUtil#escapeTermForQuote
+     */
+    public static String escapeTermPlain(String term) {
+        return ClientUtils.escapeQueryChars(term);
+        // Reference implementation:
+//        StringBuilder sb = new StringBuilder();
+//        for (int i = 0; i < s.length(); i++) {
+//          char c = s.charAt(i);
+//          // These characters are part of the query syntax and must be escaped
+//          if (c == '\\' || c == '+' || c == '-' || c == '!'  || c == '(' || c == ')' || c == ':'
+//            || c == '^' || c == '[' || c == ']' || c == '\"' || c == '{' || c == '}' || c == '~'
+//            || c == '*' || c == '?' || c == '|' || c == '&'  || c == ';' || c == '/'
+//            || Character.isWhitespace(c)) {
+//            sb.append('\\');
+//          }
+//          sb.append(c);
+//        }
+//        return sb.toString();
+    }
+    
+    static boolean isSyntaxDelimChar(char c) {
+        return c == '+' || c == '-' || c == '!'  || c == '(' || c == ')' || c == ':'
+                || c == '^' || c == '[' || c == ']' || c == '\"' || c == '{' || c == '}' || c == '~'
+                || c == '*' || c == '?' || c == '|' || c == '&'  || c == ';' || c == '/';
+    }
 
     /**
      * Escapes all special solr/query characters in the given query term intended to be
@@ -135,7 +162,7 @@ public abstract class SolrExprUtil {
             } else if (SolrExprUtil.isQueryCharEscaped(c, backslashCount)) {
                 term.append(c);
             } else {
-                if (SolrUtil.termEnclosingCharMap.containsKey(c)) {
+                if (termEnclosingCharMap.containsKey(c)) {
                     int endIndex = SolrExprUtil.findTermClosingCharIndex(queryExpr, i, c);
                     if (endIndex > i) {
                         term.append(queryExpr.substring(i, endIndex+1));
@@ -184,7 +211,7 @@ public abstract class SolrExprUtil {
 
     static int findTermClosingCharIndex(String queryExpr, int start, char openChar) {
         int i = start + 1;
-        char closingChar = SolrUtil.termEnclosingCharMap.get(openChar); // NPE if bad openChar
+        char closingChar = termEnclosingCharMap.get(openChar); // NPE if bad openChar
         if (openChar == '"') { // for quote, can ignore all chars except quote and backslash
             int backslashCount = 0;
             while (i < queryExpr.length()) {
@@ -243,12 +270,12 @@ public abstract class SolrExprUtil {
 
     public static List<String> addPrefixToAllTerms(List<String> terms, String prefix) {
         List<String> newTerms = new ArrayList<>(terms.size());
-        Set<Character> noCharPrefix = SolrUtil.noPrefixTermCharPrefixes;
+        Set<Character> noCharPrefix = noPrefixTermCharPrefixes;
         if (prefix.length() == 1) { // optimization
             noCharPrefix = new HashSet<>(noCharPrefix);
             noCharPrefix.add(prefix.charAt(0));
             for(String term : terms) {
-                if (!term.isEmpty() && !SolrUtil.noPrefixTerms.contains(term) && !noCharPrefix.contains(term.charAt(0))) {
+                if (!term.isEmpty() && !noPrefixTerms.contains(term) && !noCharPrefix.contains(term.charAt(0))) {
                     newTerms.add(prefix + term);
                 } else {
                     newTerms.add(term);
@@ -256,12 +283,171 @@ public abstract class SolrExprUtil {
             }
         } else {
             for(String term : terms) {
-                if (!term.isEmpty() && !SolrUtil.noPrefixTerms.contains(term) && !noCharPrefix.contains(term.charAt(0)) && !term.startsWith(prefix)) {
+                if (!term.isEmpty() && !noPrefixTerms.contains(term) && !noCharPrefix.contains(term.charAt(0)) && !term.startsWith(prefix)) {
                     newTerms.add(prefix + term);
                 } else {
                     newTerms.add(term);
                 }
             }
+        }
+        return newTerms;
+    }
+    
+    public enum WildcardMode {
+        /**
+         * Produces wildcard term in the form: *xxx*
+         */
+        NGRAM,
+        /**
+         * Produces wildcard term in the form: xxx*
+         */
+        EDGE_NGRAM_FRONT,
+        /**
+         * Produces wildcard term in the form: *xxx
+         */
+        EDGE_NGRAM_BACK,
+        /**
+         * Produces wildcard term in the form: xxx* *xxx
+         */
+        EDGE_NGRAM_BOTH
+    }
+    
+    /**
+     * Transforms all the simple terms in the query into wildcarded terms ORed in parenthesis.
+     * Simple pre-parser to implement partial word matching in the query itself, instead of using Ngram filters.
+     * <p>
+     * Ignores quoted terms.
+     * <p>
+     * For example, with WildcardMode=EDGE_NGRAM_BOTH, retainNonWild=true, wildWeight="0.5":
+     *   "hello world" 
+     * become:
+     *   "(hello OR hello*^0.5 OR *hello^0.5) (world OR world*^0.5 OR *world^0.5)"
+     *   
+     * TODO: currently only supports the edismax syntax elements most used by common users.
+     * Missing (not exhaustive): fuzzy/prox search (~), single wildcard (?), range searches...
+     * 
+     * @param queryExpr the input query expression
+     * @param wildcardMode 
+     * @param retainNonWild if true, include non-wildcard expression with optional different weight
+     * @param nonWildWeight weight (^) added to the non-wildcard expression, if present
+     * @param wildWeight weight (^) added to the wildcard expressions
+     * @param minTermSize min term size (do not expand if smaller)
+     * @param maxTermSize max term size (do not expand if larger)
+     * @param deep whether first level only or also do nested expressions in parenthesis too
+     * @return the transformed query expression
+     */
+    public static String makeWildcardSimpleSearchTerms(String queryExpr, WildcardMode wildcardMode, boolean retainNonWild, 
+            String nonWildWeight, String wildWeight, Integer minTermSize, Integer maxTermSize, boolean deep) {
+        return StringUtils.join(makeWildcardSimpleSearchTerms(extractTopTerms(queryExpr), wildcardMode, retainNonWild, nonWildWeight, wildWeight, minTermSize, maxTermSize, deep), " ");
+    }
+    
+    public static List<String> makeWildcardSimpleSearchTerms(List<String> terms, WildcardMode wildcardMode, boolean retainNonWild, 
+            String nonWildWeight, String wildWeight, Integer minTermSize, Integer maxTermSize, boolean deep) {
+        if (minTermSize == null) minTermSize = 0;
+        if (maxTermSize == null) maxTermSize = Integer.MAX_VALUE;
+        List<String> newTerms = new ArrayList<>(terms.size());
+        for(String term : terms) {
+            String resultTerm = term;
+            if (!term.isEmpty() && !noPrefixTerms.contains(term)) {
+                String coreTerm = term;
+                char first = coreTerm.charAt(0);
+                String prefix = "";
+                if (first == '+' || first == '-' || first == '!') {
+                    prefix = String.valueOf(first);
+                    coreTerm = coreTerm.substring(1);
+                }
+                Matcher m = solrFieldNamePrefixExpr.matcher(coreTerm);
+                if (m.matches()) {
+                    prefix += m.group(1);
+                    coreTerm = m.group(2);
+                }
+                if (!coreTerm.isEmpty() && (!isSyntaxDelimChar(coreTerm.charAt(0)) || (deep && first == '('))) {
+                    // FIXME: missing escape handling (rarely used from public)
+                    String[] weightParts = StringUtils.split(coreTerm, "^", 2);
+                    String suffix = "";
+                    if (weightParts.length == 2) {
+                        coreTerm = weightParts[0];
+                        suffix = "^" + weightParts[1];
+                    }
+                    char last = coreTerm.charAt(coreTerm.length() - 1);
+                    
+                    // if already a wildcard, skip it (leading wildcard counted in isSyntaxDelimChar)
+                    if (last != '*') {
+                        if (first == '(') {
+                            if (last == ')' && coreTerm.length() >= 3) {
+                                // recursion for parenthesis (must be well-formed, otherwise don't touch)
+                                StringBuilder sb = new StringBuilder(prefix);
+                                sb.append("(");
+                                
+                                String subQueryExpr = coreTerm.substring(1, coreTerm.length() - 1);
+                                sb.append(makeWildcardSimpleSearchTerms(subQueryExpr, wildcardMode, retainNonWild, nonWildWeight, wildWeight, minTermSize, maxTermSize, deep));
+                                
+                                sb.append(")");
+                                sb.append(suffix);
+                                resultTerm = sb.toString();
+                            }
+                        } else if (coreTerm.length() >= minTermSize && coreTerm.length() <= maxTermSize) {
+                            // replace "term" with "(term term* *term)" or as requested
+                            StringBuilder sb = new StringBuilder(prefix);
+                            sb.append("(");
+                            
+                            if (retainNonWild) {
+                                sb.append(coreTerm);
+                                if (nonWildWeight != null) {
+                                    sb.append("^");
+                                    sb.append(nonWildWeight);
+                                }
+                                sb.append(" OR ");
+                            }
+                            
+                            if (wildcardMode == WildcardMode.EDGE_NGRAM_BOTH) {
+                                if (wildWeight != null) {
+                                    sb.append(coreTerm);
+                                    sb.append("*^");
+                                    sb.append(wildWeight);
+                                    sb.append(" OR *");
+                                    sb.append(coreTerm);
+                                    sb.append("^");
+                                    sb.append(wildWeight);
+                                } else {
+                                    sb.append(coreTerm);
+                                    sb.append("* OR *");
+                                    sb.append(coreTerm);
+                                }
+                            } else if (wildcardMode == WildcardMode.EDGE_NGRAM_FRONT) {
+                                if (wildWeight != null) {
+                                    sb.append(coreTerm);
+                                    sb.append("*^");
+                                    sb.append(wildWeight);
+                                } else {
+                                    sb.append(coreTerm);
+                                    sb.append("*");
+                                }
+                            } else if (wildcardMode == WildcardMode.EDGE_NGRAM_BACK) {
+                                sb.append("*");
+                                sb.append(coreTerm);
+                                if (wildWeight != null) {
+                                    sb.append("^");
+                                    sb.append(wildWeight);
+                                }
+                            } else { // NGRAM
+                                sb.append("*");
+                                sb.append(coreTerm);
+                                sb.append("*");
+                                if (wildWeight != null) {
+                                    sb.append("^");
+                                    sb.append(wildWeight);
+                                }
+                            }
+                            
+                            sb.append(")");
+                            sb.append(suffix);
+                            resultTerm = sb.toString();
+                        }
+                    }
+                }
+            }
+            newTerms.add(resultTerm);
         }
         return newTerms;
     }

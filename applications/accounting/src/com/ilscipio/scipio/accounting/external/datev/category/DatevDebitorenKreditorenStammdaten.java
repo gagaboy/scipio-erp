@@ -12,7 +12,7 @@ import org.ofbiz.entity.condition.EntityCondition;
 import org.ofbiz.entity.condition.EntityJoinOperator;
 import org.ofbiz.entity.util.EntityUtil;
 
-import com.ilscipio.scipio.accounting.external.AbstractOperationResults;
+import com.ilscipio.scipio.accounting.external.BaseOperationResults;
 import com.ilscipio.scipio.accounting.external.BaseOperationStats;
 import com.ilscipio.scipio.accounting.external.datev.DatevException;
 import com.ilscipio.scipio.accounting.external.datev.DatevHelper;
@@ -31,15 +31,16 @@ public class DatevDebitorenKreditorenStammdaten extends AbstractDatevDataCategor
     public void processRecord(int index, Map<String, String> recordMap) throws DatevException {
         Map<String, GenericValue> recordsToStore = FastMap.newInstance();
         try {
-            for (GenericValue fieldDefinition : getDatevFieldDefinitions()) {
-                String fieldId = fieldDefinition.getString("fieldId");
-                String fieldName = fieldDefinition.getString("fieldName");
+            for (String fieldName : recordMap.keySet()) {
+//                String fieldId = fieldDefinition.getString("fieldId");
+//                String fieldName = fieldDefinition.getString("fieldName");
                 String value = recordMap.get(fieldName);
                 // if (Debug.isOn(Debug.VERBOSE)) {
                 Debug.logInfo("Processing record [" + index + "] field [" + fieldName + "]: " + value, module);
                 // }
                 
-                GenericValue mappingDefinition = EntityUtil.getFirst(EntityUtil.filterByAnd(getDatevMappingDefinitions(), UtilMisc.toMap("fieldId", fieldId)));
+                GenericValue fieldDefinition = EntityUtil.getFirst(EntityUtil.filterByAnd(getDatevFieldDefinitions(), UtilMisc.toMap("fieldName", fieldName)));
+                GenericValue mappingDefinition = getDatevMappingDefinitions().get(fieldDefinition.getString("fieldId"));
                 if (UtilValidate.isNotEmpty(mappingDefinition)) {
                     String entityName = mappingDefinition.getString("entityName");
                     String entityField = mappingDefinition.getString("entityField");
@@ -87,7 +88,7 @@ public class DatevDebitorenKreditorenStammdaten extends AbstractDatevDataCategor
     }
 
     @Override
-    public Class<? extends AbstractOperationResults> getOperationResultsClass() throws DatevException {
+    public Class<? extends BaseOperationResults> getOperationResultsClass() throws DatevException {
         return null;
     }
 

@@ -24,7 +24,7 @@ under the License.
 <#assign ofbizServerName = application.getAttribute("_serverId")!"default-server">
 <#assign contextPath = request.getContextPath()>
 <#if person?has_content>
-  <#assign userName = person.firstName! + " " + person.middleName! + " " + person.lastName!>
+  <#assign userName = (person.firstName!"") + " " + (person.middleName!"") + " " + (person.lastName!"")>
 <#elseif partyGroup?has_content>
   <#assign userName = partyGroup.groupName!>
 <#elseif userHasAccount><#-- NOTE: see common.ftl for userHasAccount setup -->
@@ -216,8 +216,13 @@ under the License.
 </#if>
 <#-- Twitter Authentication Addon (required)-->
 <#if getPropertyMsg("shop.properties","twitter.enabled")== "Y">
-    <#include "component://auth-twitter/webapp/facebook/fb-twitter.ftl"/>
+    <#include "component://auth-twitter/webapp/twitter/twitter-common.ftl"/>
     <@twitterInit/>
+</#if>
+<#-- LinkedIn Authentication Addon (required)-->
+<#if getPropertyMsg("shop.properties","linkedin.enabled")== "Y">
+    <#include "component://auth-linkedin/webapp/linkedin/linkedin-common.ftl"/>
+    <@linkedinInit/>
 </#if>
 <#-- ================================ -->
 <div class="header" id="header">

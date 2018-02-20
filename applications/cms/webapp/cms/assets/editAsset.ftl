@@ -81,7 +81,7 @@
                 <@field type="textarea" name="description" value=(assetTemplateModel.getDescription(locale)!) required=false label=uiLabelMap.CommonDescription/>
             </@cmsCopyMenuItem>
             <@menuitem type="generic">
-                <@modal id="modal_new_attr" label=uiLabelMap.CmsAddAttribute class="+${styles.menu_button_item_link!} ${styles.action_nav!} ${styles.action_add!}">
+                <@modal id="modal_new_attr" label=uiLabelMap.CmsAddAttribute linkClass="+${styles.menu_button_item_link!} ${styles.action_nav!} ${styles.action_add!}">
                     <@heading>${uiLabelMap.CmsAddAttribute}</@heading>
                     <form method="post" action="<@ofbizUrl>addAttributeToAsset</@ofbizUrl>" id="new-attribute-form">
                     <@fields type="default-compact">
@@ -94,7 +94,7 @@
             </@menuitem>
             
             <@menuitem type="generic">
-                <@modal id="modal_new_script" label=uiLabelMap.CmsAddScript class="+${styles.menu_button_item_link!} ${styles.action_nav!} ${styles.action_add!}">
+                <@modal id="modal_new_script" label=uiLabelMap.CmsAddScript linkClass="+${styles.menu_button_item_link!} ${styles.action_nav!} ${styles.action_add!}">
                     <@heading>${uiLabelMap.CmsAddScript}</@heading>
                     <@fields type="default-compact">
                         <@cmsScriptTemplateSelectForm formAction=makeOfbizUrl("addScriptToAsset")>
@@ -147,7 +147,7 @@
                     <#-- Attributes -->
                     <#if assetAttr?has_content>
                         <@section title=uiLabelMap.CmsTemplateAttributes class="+editorAttr">
-                          <@table type="data-complex">
+                          <@table type="data-complex" autoAltRows=true responsive=true scrollable=true fixedColumnsRight=1>
                             <@thead>
                                 <@tr>
                                     <@th>inputPos</@th>

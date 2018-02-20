@@ -625,6 +625,12 @@
       <@field type="display">Display value</@field>
       <@field type="input" name="input3" label="Input 3" />
       <@field type="input" name="input3nolabel" />
+      <@field type="email" name="input3a" label="Input 3a - Email"/>
+      <@field type="password" name="input3b" label="Input 3b - Password"/>
+      <@field type="number" name="input3c" label="Input 3c - Number"/>
+      <@field type="file" name="input3d" label="Input 3d - File"/>
+      <@field type="url" name="input3e" label="Input 3e - Url"/>
+      <@field type="color" name="input3f" label="Input 3f - Color"/>
 
       <@field type="lookup" name="lookup1" label="Lookup 1 (Geo)" formName="form1" fieldFormName="LookupGeo" tooltip="Lookup geos!"/>
       <#macro custLabelAreaTest args={}>
@@ -1730,6 +1736,14 @@
 </@section>
 
 <@section title="URL generation">
+  <#assign shopWebSiteId = rawString(shopInfo.webSiteId!)>
+  <#assign shopMountPoint = rawString(shopInfo.mountPoint!)>
+  <#if shopMountPoint == "/">
+    <#assign shopMainUri = "/control/main">
+  <#else>
+    <#assign shopMainUri = shopMountPoint + "/control/main">
+  </#if>
+
   <@section title="Current webapp/context info">
     <ul>
       <li>
@@ -1740,6 +1754,7 @@
     </ul>
   </@section>
   
+<#if shopWebSiteId?has_content>
   <@section title="Standard navigation URLs">
     <ul>
       <li><@ofbizUrl uri="WebtoolsLayoutDemo?param1=val1&param2=val2" escapeAs='html'/> <em>(html post-escaping - <strong>strongly preferred</strong> to pre-escaping)</em></li>
@@ -1757,35 +1772,38 @@
       <li><@ofbizUrl fullPath=true secure=false>WebtoolsLayoutDemo?param1=val1&amp;param2=val2</@ofbizUrl></li>
       <li><@ofbizUrl fullPath=true secure="false">WebtoolsLayoutDemo?param1=val1&amp;param2=val2</@ofbizUrl></li>
       <li><@ofbizUrl fullPath=true encode=false>WebtoolsLayoutDemo?param1=val1&amp;param2=val2</@ofbizUrl></li>
-      <li><@ofbizUrl uri="main" webSiteId="ScipioWebStore"/></li>
+      <li><@ofbizUrl uri="main" webSiteId=shopWebSiteId/></li>
       <li><@ofbizWebappUrl uri="/control/WebtoolsLayoutDemo?param1=val1&amp;param2=val2" /></li>
-      <li><@ofbizInterWebappUrl uri="/shop/control/main" /></li>
-      <li><@ofbizInterWebappUrl uri="/shop/control/main" fullPath=true/></li>
+      
+      <li><@ofbizInterWebappUrl uri=shopMainUri /></li>
+      <li><@ofbizInterWebappUrl uri=shopMainUri fullPath=true/></li>
       <#-- Explicitly allow downgrading to HTTP -->
-      <li><@ofbizInterWebappUrl uri="/shop/control/main" secure=false/></li>
+      <li><@ofbizInterWebappUrl uri=shopMainUri secure=false/></li>
       <#-- Explicitly allow downgrading to HTTP -->
-      <li><@ofbizInterWebappUrl uri="/shop/control/main" fullPath=true secure=false/></li>
-      <li><@ofbizInterWebappUrl uri="main" webSiteId="ScipioWebStore" /></li>
-      <li>${makeOfbizInterWebappUrl("/shop/control/main")}</li>
-      <li>${makeOfbizInterWebappUrl("main", "ScipioWebStore")}</li>
-      <li>${makeOfbizInterWebappUrl({"uri":"main", "webSiteId":"ScipioWebStore", "extLoginKey": true})}</li>
-      <li>${makeOfbizInterWebappUrl({"uri":"main?param1=val1&amp;param2=val2", "webSiteId":"ScipioWebStore", "extLoginKey": true})}</li>
+      <li><@ofbizInterWebappUrl uri=shopMainUri fullPath=true secure=false/></li>
+      <li><@ofbizInterWebappUrl uri="main" webSiteId=shopWebSiteId /></li>
+      <li>${makeOfbizInterWebappUrl(shopMainUri)}</li>
+    
+      <li>${makeOfbizInterWebappUrl("main", shopWebSiteId)}</li>
+      <li>${makeOfbizInterWebappUrl({"uri":"main", "webSiteId":shopWebSiteId, "extLoginKey": true})}</li>
+      <li>${makeOfbizInterWebappUrl({"uri":"main?param1=val1&amp;param2=val2", "webSiteId":shopWebSiteId, "extLoginKey": true})}</li>
     </ul>
   </@section>
   
   <@section title="Non-standard navigation URLs">
     <p><em>NOTE: These are not invalid, but needlessly obscure; for testing.</em></p>
     <ul>
-      <li><@ofbizInterWebappUrl uri="/shop/control/main" webSiteId="ScipioWebStore" absPath=true /></li>
-      <li><@ofbizInterWebappUrl uri="/shop/control/main" controller=true /></li>
-      <li><@ofbizInterWebappUrl uri="/shop/control/main" controller=false /></li>
+      <li><@ofbizInterWebappUrl uri=shopMainUri webSiteId=shopWebSiteId absPath=true /></li>
+      <li><@ofbizInterWebappUrl uri=shopMainUri controller=true /></li>
+      <li><@ofbizInterWebappUrl uri=shopMainUri controller=false /></li>
       <#-- NOTE: if controller false, can't detect some cases of fullPath requirements -->
-      <li><@ofbizInterWebappUrl uri="/shop/control/main" controller=false fullPath=true/></li>
+      <li><@ofbizInterWebappUrl uri=shopMainUri controller=false fullPath=true/></li>
       <#-- Allow downgrade -->
-      <li><@ofbizInterWebappUrl uri="/shop/control/main" controller=false fullPath=true secure=false/></li>
-      <li><@ofbizInterWebappUrl uri="/shop/control/main" controller=false secure=true/></li>
-      <li><@ofbizInterWebappUrl uri="/control/main" webSiteId="ScipioWebStore" controller=false /></li>
-      <li><@ofbizInterWebappUrl uri="main" webSiteId="ScipioWebStore" controller=true /></li>
+      <li><@ofbizInterWebappUrl uri=shopMainUri controller=false fullPath=true secure=false/></li>
+      <li><@ofbizInterWebappUrl uri=shopMainUri controller=false secure=true/></li>
+      
+      <li><@ofbizInterWebappUrl uri="/control/main" webSiteId=shopWebSiteId controller=false /></li>
+      <li><@ofbizInterWebappUrl uri="main" webSiteId=shopWebSiteId controller=true /></li>
       <li><@ofbizUrl absPath=true interWebapp=false controller=true uri="/admin/control/main" /></li>
       <li><@ofbizUrl absPath=true interWebapp=true controller=true uri="/admin/control/main" /></li>
       <li><@ofbizUrl absPath=true interWebapp=false controller=false uri="/admin/control/main" /></li>
@@ -1796,39 +1814,39 @@
   <@section title="Inter-webapp catalog URLs">
     <p><em>NOTE: These should only reference a webapp configured to handle these in its web.xml file.</em></p>
     <ul>
-      <li><@ofbizCatalogUrl webSiteId="ScipioWebStore" productId="PH-1000" /></li>
-      <li><@ofbizCatalogUrl prefix="/shop" productId="PH-1000" /></li>
-      <li><@ofbizCatalogAltUrl webSiteId="ScipioWebStore" productId="PH-1000" /></li>
-      <li><@ofbizCatalogAltUrl prefix="/shop" productId="PH-1000" /></li>
-      <li><@ofbizCatalogUrl webSiteId="ScipioWebStore" productId="PH-1000" fullPath=true/></li>
-      <li><@ofbizCatalogUrl prefix="/shop" productId="PH-1000" fullPath=true/></li>
-      <li><@ofbizCatalogAltUrl webSiteId="ScipioWebStore" productId="PH-1000" fullPath=true /></li>
-      <li><@ofbizCatalogAltUrl prefix="/shop" productId="PH-1000" fullPath=true /></li>
-      <li><@ofbizCatalogUrl webSiteId="ScipioWebStore" productId="PH-1000" fullPath=true secure=true/></li>
-      <li><@ofbizCatalogUrl prefix="/shop" productId="PH-1000" fullPath=true secure=true/></li>
-      <li><@ofbizCatalogAltUrl webSiteId="ScipioWebStore" productId="PH-1000" fullPath=true secure=true params="?test1=val1&test2=val2"?html/></li>
-      <li><@ofbizCatalogAltUrl prefix="/shop" productId="PH-1000" fullPath=true secure=true params="test1=val1&test2=val2"?html /></li>
-      <li><@ofbizCatalogUrl webSiteId="ScipioWebStore" productId="PH-1000" secure=false/></li>
-      <li><@ofbizCatalogUrl prefix="/shop" productId="PH-1000" secure=false/></li>
-      <li><@ofbizCatalogAltUrl webSiteId="ScipioWebStore" productId="PH-1000" secure=false /></li>
-      <li><@ofbizCatalogAltUrl prefix="/shop" productId="PH-1000" secure=false /></li>
+      <li><@ofbizCatalogUrl webSiteId=shopWebSiteId productId="PH-1000" /></li>
+      <li><@ofbizCatalogUrl prefix=shopMountPoint productId="PH-1000" /></li>
+      <li><@ofbizCatalogAltUrl webSiteId=shopWebSiteId productId="PH-1000" /></li>
+      <li><@ofbizCatalogAltUrl prefix=shopMountPoint productId="PH-1000" /></li>
+      <li><@ofbizCatalogUrl webSiteId=shopWebSiteId productId="PH-1000" fullPath=true/></li>
+      <li><@ofbizCatalogUrl prefix=shopMountPoint productId="PH-1000" fullPath=true/></li>
+      <li><@ofbizCatalogAltUrl webSiteId=shopWebSiteId productId="PH-1000" fullPath=true /></li>
+      <li><@ofbizCatalogAltUrl prefix=shopMountPoint productId="PH-1000" fullPath=true /></li>
+      <li><@ofbizCatalogUrl webSiteId=shopWebSiteId productId="PH-1000" fullPath=true secure=true/></li>
+      <li><@ofbizCatalogUrl prefix=shopMountPoint productId="PH-1000" fullPath=true secure=true/></li>
+      <li><@ofbizCatalogAltUrl webSiteId=shopWebSiteId productId="PH-1000" fullPath=true secure=true params="?test1=val1&test2=val2"?html/></li>
+      <li><@ofbizCatalogAltUrl prefix=shopMountPoint productId="PH-1000" fullPath=true secure=true params="test1=val1&test2=val2"?html /></li>
+      <li><@ofbizCatalogUrl webSiteId=shopWebSiteId productId="PH-1000" secure=false/></li>
+      <li><@ofbizCatalogUrl prefix=shopMountPoint productId="PH-1000" secure=false/></li>
+      <li><@ofbizCatalogAltUrl webSiteId=shopWebSiteId productId="PH-1000" secure=false /></li>
+      <li><@ofbizCatalogAltUrl prefix=shopMountPoint productId="PH-1000" secure=false /></li>
     
-      <li><@ofbizCatalogUrl webSiteId="ScipioWebStore" currentCategoryId="EL-PHN-101" /></li>
-      <li><@ofbizCatalogUrl prefix="/shop" currentCategoryId="EL-PHN-101" /></li>
-      <li><@ofbizCatalogAltUrl webSiteId="ScipioWebStore" productCategoryId="EL-PHN-101" /></li>
-      <li><@ofbizCatalogAltUrl prefix="/shop" productCategoryId="EL-PHN-101" /></li>
-      <li><@ofbizCatalogUrl webSiteId="ScipioWebStore" currentCategoryId="EL-PHN-101" fullPath=true/></li>
-      <li><@ofbizCatalogUrl prefix="/shop" currentCategoryId="EL-PHN-101" fullPath=true/></li>
-      <li><@ofbizCatalogAltUrl webSiteId="ScipioWebStore" productCategoryId="EL-PHN-101" fullPath=true /></li>
-      <li><@ofbizCatalogAltUrl prefix="/shop" productCategoryId="EL-PHN-101" fullPath=true /></li>
-      <li><@ofbizCatalogUrl webSiteId="ScipioWebStore" currentCategoryId="EL-PHN-101" fullPath=true secure=true/></li>
-      <li><@ofbizCatalogUrl prefix="/shop" currentCategoryId="EL-PHN-101" fullPath=true secure=true/></li>
-      <li><@ofbizCatalogAltUrl webSiteId="ScipioWebStore" productCategoryId="EL-PHN-101" fullPath=true secure=true /></li>
-      <li><@ofbizCatalogAltUrl prefix="/shop" productCategoryId="EL-PHN-101" fullPath=true secure=true /></li>
-      <li><@ofbizCatalogUrl webSiteId="ScipioWebStore" currentCategoryId="EL-PHN-101" fullPath=true secure=false/></li>
-      <li><@ofbizCatalogUrl prefix="/shop" currentCategoryId="EL-PHN-101" fullPath=true secure=false/></li>
-      <li><@ofbizCatalogAltUrl webSiteId="ScipioWebStore" productCategoryId="EL-PHN-101" fullPath=true secure=false params="test1=val1&test2=val2"?html/></li>
-      <li><@ofbizCatalogAltUrl prefix="/shop" productCategoryId="EL-PHN-101" fullPath=true secure=false /></li>
+      <li><@ofbizCatalogUrl webSiteId=shopWebSiteId currentCategoryId="EL-PHN-101" /></li>
+      <li><@ofbizCatalogUrl prefix=shopMountPoint currentCategoryId="EL-PHN-101" /></li>
+      <li><@ofbizCatalogAltUrl webSiteId=shopWebSiteId productCategoryId="EL-PHN-101" /></li>
+      <li><@ofbizCatalogAltUrl prefix=shopMountPoint productCategoryId="EL-PHN-101" /></li>
+      <li><@ofbizCatalogUrl webSiteId=shopWebSiteId currentCategoryId="EL-PHN-101" fullPath=true/></li>
+      <li><@ofbizCatalogUrl prefix=shopMountPoint currentCategoryId="EL-PHN-101" fullPath=true/></li>
+      <li><@ofbizCatalogAltUrl webSiteId=shopWebSiteId productCategoryId="EL-PHN-101" fullPath=true /></li>
+      <li><@ofbizCatalogAltUrl prefix=shopMountPoint productCategoryId="EL-PHN-101" fullPath=true /></li>
+      <li><@ofbizCatalogUrl webSiteId=shopWebSiteId currentCategoryId="EL-PHN-101" fullPath=true secure=true/></li>
+      <li><@ofbizCatalogUrl prefix=shopMountPoint currentCategoryId="EL-PHN-101" fullPath=true secure=true/></li>
+      <li><@ofbizCatalogAltUrl webSiteId=shopWebSiteId productCategoryId="EL-PHN-101" fullPath=true secure=true /></li>
+      <li><@ofbizCatalogAltUrl prefix=shopMountPoint productCategoryId="EL-PHN-101" fullPath=true secure=true /></li>
+      <li><@ofbizCatalogUrl webSiteId=shopWebSiteId currentCategoryId="EL-PHN-101" fullPath=true secure=false/></li>
+      <li><@ofbizCatalogUrl prefix=shopMountPoint currentCategoryId="EL-PHN-101" fullPath=true secure=false/></li>
+      <li><@ofbizCatalogAltUrl webSiteId=shopWebSiteId productCategoryId="EL-PHN-101" fullPath=true secure=false params="test1=val1&test2=val2"?html/></li>
+      <li><@ofbizCatalogAltUrl prefix=shopMountPoint productCategoryId="EL-PHN-101" fullPath=true secure=false /></li>
     </ul>
   </@section>
   
@@ -1876,6 +1894,9 @@
       <li><@ofbizContentUrl uri=rewrapString("/image/some-thing/original.jpg") variant="-detail"/> (force-append)</li>
     </ul>
   </@section>
+<#else>
+  <p>WARNING: No WebSite in system available to use for link tests</p>
+</#if>
   
   <@section title="Misc URL tests">
     <ul>
