@@ -380,7 +380,13 @@ public class LoginWorker {
      */
     public static String login(HttpServletRequest request, HttpServletResponse response) {
         HttpSession session = request.getSession();
-
+        
+        GenericValue userLogin = (GenericValue) request.getSession().getAttribute("userLogin");
+        
+        if(UtilValidate.isNotEmpty(userLogin)){
+            return "loggedIn";
+        }
+        
         String username = request.getParameter("USERNAME");
         String password = request.getParameter("PASSWORD");
 
@@ -520,7 +526,7 @@ public class LoginWorker {
         }
 
         if (ModelService.RESPOND_SUCCESS.equals(result.get(ModelService.RESPONSE_MESSAGE))) {
-            GenericValue userLogin = (GenericValue) result.get("userLogin");
+            userLogin = (GenericValue) result.get("userLogin");
 
             if (requirePasswordChange) {
                 Map<String, Object> inMap = UtilMisc.<String, Object>toMap("login.username", username, "login.password", password, "locale", UtilHttp.getLocale(request));
@@ -568,6 +574,8 @@ public class LoginWorker {
             // check to see if a password change is required for the user
             Map<String, Object> userLoginSession = checkMap(result.get("userLoginSession"), String.class, Object.class);
             if (userLogin != null && "Y".equals(userLogin.getString("requirePasswordChange"))) {
+            	// SCIPIO: 03/02/2018 added the userLogin as a tmpUserLogin in requestAttributes so we can extend the check in the screens
+            	request.setAttribute("tmpUserLogin", userLogin);
                 return "requirePasswordChange";
             }
             String autoChangePassword = EntityUtilProperties.getPropertyValue("security.properties", "user.auto.change.password.enable", "false", delegator);

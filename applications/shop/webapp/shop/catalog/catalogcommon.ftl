@@ -108,11 +108,9 @@
             ${uiLabelMap.CommonDepth}: ${product.productDepth!} ${((depthUom.abbreviation)?default(product.depthUomId))!}
         </p>
     </#if>
-
     <#if daysToShip??>
         <p id="product-specs-days-to-ship">${uiLabelMap.ProductUsuallyShipsIn} ${daysToShip} ${uiLabelMap.CommonDays}!</p>
     </#if>
-
     <#if disFeatureList?? && (0 < disFeatureList.size())>                
         <#list disFeatureList as currentFeature>
             <#assign disFeatureType = currentFeature.getRelatedOneCache("ProductFeatureType") />
@@ -121,7 +119,6 @@
             </p>
         </#list>
     </#if>
-
     <#-- SCIPIO: Debugging info
     <@heading relLevel=+1>Debugging Info</@heading>
     <p style="font-size:0.7em;">Product ID: ${product.productId}</p>
@@ -294,3 +291,16 @@
     </#if>
     <#return catName>
 </#function>
+
+<#macro ratingAsStars rating>
+    <#if rating?round &gt; 0>
+        <#list 1..rating?round as star>
+            <i class="${styles.icon} ${styles.icon_prefix}star"></i>
+        </#list>
+    </#if>
+    <#if (5-rating)?round &gt; 0>
+    <#list 1..((5-rating)?round) as star>
+        <i class="${styles.icon} ${styles.icon_prefix}star-o"></i>
+    </#list>
+    </#if>
+</#macro>

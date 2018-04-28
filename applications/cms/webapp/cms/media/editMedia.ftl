@@ -90,11 +90,11 @@
                             <@field type="display" label=uiLabelMap.CommonPath><a href="${escapeFullUrl(mediaUrl, 'html')}">${escapeFullUrl(mediaUrl, 'htmlmarkup')}</a></@field>
                             <#-- DEV NOTE: you must submit altValue otherwise the service didn't recognize properly -->
                             <@field type="checkbox" name="isPublic" label=uiLabelMap.FormFieldTitle_isPublic value="true" altValue="false" checked=((media.isPublic!)=="Y") />
-                            <@field type="display" label=uiLabelMap.CmsMediaType value=(dataResourceTypeIdVal!"") />
+                            <@field type="display" label=uiLabelMap.CommonMediaType value=(dataResourceTypeIdVal!"") />
                             <@field type="display" label=uiLabelMap.CmsMediaOriginalName value=(media.objectInfo!"") />                            
 
                             <#if fileSizeAttr?has_content>
-                                <#assign fileSize = Static["com.ilscipio.scipio.cms.util.fileType.FileTypeUtil"].formatFileSize(fileSizeAttr.attrValue, dispatcher, locale) />
+                                <#assign fileSize = Static["com.ilscipio.scipio.common.util.fileType.FileTypeUtil"].formatFileSize(fileSizeAttr.attrValue, dispatcher, locale) />                                							
                                 <@field type="display" label=uiLabelMap.CommonSize value=fileSize />
                             </#if>
                             <@field type="display" label=uiLabelMap.FormFieldTitle_createdDate value=media.createdDate valueType="date" />
@@ -128,7 +128,7 @@
                             </#if>
                         <#else>
                             <#assign imageSelected = ((parameters.dataResourceTypeId!) == "IMAGE_OBJECT")>
-                            <@field type="select" label=uiLabelMap.CmsMediaTypes name="dataResourceTypeId" required=true>
+                            <@field type="select" label=uiLabelMap.CommonMediaTypes name="dataResourceTypeId" required=true>
                                 <option value="IMAGE_OBJECT"<#if (parameters.dataResourceTypeId!) == "IMAGE_OBJECT"> selected</#if>>${uiLabelMap.CommonImage}</option>
                                 <option value="VIDEO_OBJECT"<#if (parameters.dataResourceTypeId!) == "VIDEO_OBJECT"> selected</#if>>${uiLabelMap.ContentResourceVideo}</option>
                                 <option value="AUDIO_OBJECT"<#if (parameters.dataResourceTypeId!) == "AUDIO_OBJECT"> selected</#if>>${uiLabelMap.ContentResourceAudio}</option>

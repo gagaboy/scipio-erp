@@ -2026,7 +2026,7 @@ Returns the given value, bypassing the screen renderer html auto-escaping, as a 
 This is the same as the Ofbiz-provided function, {{{StringUtil.wrapString}}}, but further simplifies
 the resulting type into a simple Freemarker string.
 
-This can be seen as the reverse operation of #rewrapStringStd.
+This can be seen as the reverse operation of #rewrapString.
 
 NOTE: 2016-09-29: Now tolerates non-strings, which will be coerced to strings using ?string operator.
 
@@ -2044,7 +2044,7 @@ NOTE: 2016-10-20: Now supports multiple parameters, which are each {{{rawString}
                                     rawString(var1) + " " + rawString(var2)
                                   except the former is more efficient.
   * Related *
-    #rewrapStringStd  
+    #rewrapString  
     
   * History *
     Enhanced for 1.14.2.                        
@@ -3235,6 +3235,81 @@ For more information about escaping in general, see >>>standard/htmlTemplate.ftl
   </#switch>
 </#function>
 
+<#-- 
+*************
+* escapeMsg
+************
+Escapes a general message or description field, with interpretation support for certain languages.
+
+The current implementation simply performs #escapeVal plus a line-break substitution (by default)
+for lang=="htmlmarkup".
+
+This function is largely a point-of-use compatibility version of stock ofbiz behavior
+often used on description fields, event messages, etc.
+
+NOTE: For event messages, please use #escapeEventMsg instead for specific support.
+
+  * Parameters *
+    value                   = The string or string-like value to escape
+                              See #escapeVal for details.
+    lang                    = (js|jsdq|json|html|htmlmarkup|url|xml|css|js-html|html-js|htmlmarkup-js|css-html|html-css|raw) The target language for escaping
+                              See #escapeVal for details.
+    opts                    = ((map)) Additional options, including language-specific options
+                              * {{{interpret}}} {{{((boolean), default: true)}}}: if true (default), translates line-breaks
+                                when lang=="htmlmarkup" (but NOT "html")
+                              See #escapeVal for details.
+  * History *
+    Added for 1.14.4 (2018-02-27).
+-->
+<#function escapeMsg value lang opts={}>
+  <#local value = escapeVal(value, lang, opts)>
+  <#if ((opts.interpret!true) == true)>
+    <#if lang == "htmlmarkup">
+      <#-- legacy ofbiz behavior support - needed for service-multi messages and other -->
+      <#local value = value?replace("\n", "<br/>")>
+    </#if>
+  </#if>
+  <#return value>
+</#function>
+
+<#-- 
+*************
+* escapeEventMsg
+************
+Escapes a legacy screen event success or error message string for safe insertion in event/error message templates.
+
+Abstraction around #escapeMsg for event-specific formatting needs. Designed to provide a central 
+consistent escaping and interpreting behavior for the templates that output event error and success messages, 
+notably messages.ftl (framework/common/webcommon/includes/messages.ftl) and error.ftl.
+
+Currently, this attempts to support the legacy ofbiz behavior of line-break translation
+for errorMessage, errorMessageList, eventMessage and eventMessageList when lang=="htmlmarkup".
+Traditionally this was done obscurely in ofbiz by the ScreenRenderer.java class, but that was
+a design error (not point-of-use escaping) and caused several issues, so this is being
+improved for Scipio.
+
+  * Parameters *
+    value                   = The string or string-like value to escape
+                              See #escapeVal for details.
+    lang                    = (js|jsdq|json|html|htmlmarkup|url|xml|css|js-html|html-js|htmlmarkup-js|css-html|html-css|raw) The target language for escaping
+                              See #escapeVal for details.
+    opts                    = ((map)) Additional options, including language-specific options
+                              * {{{interpret}}} {{{((boolean), default: true)}}}: if true (default), translates line-breaks
+                                when lang=="htmlmarkup" (but NOT "html")
+                              See #escapeVal for details.
+  * History *
+    Added for 1.14.4 (2018-02-27).
+-->
+<#function escapeEventMsg value lang opts={}>
+  <#local value = escapeVal(value, lang, opts)>
+  <#if ((opts.interpret!true) == true)>
+    <#if lang == "htmlmarkup">
+      <#-- legacy ofbiz behavior support - needed for service-multi messages and other -->
+      <#local value = value?replace("\n", "<br/>")>
+    </#if>
+  </#if>
+  <#return value>
+</#function>
 
 <#-- 
 *************************************
@@ -4199,6 +4274,8 @@ TODO: implement as transform.
 <#macro elemAttribStr attribs includeEmpty=false emptyValToken="" noValToken="" exclude=[] 
   attribNamePrefix="" alwaysAddPrefix=true attribNamePrefixStrip="" attribNameSubstitutes={} camelCaseToDashLowerNames=false escapeLang="html">
   <#if isObjectType("map", attribs)>
+    <#-- DEV NOTE: here attribs are auto-unwrapped by Freemarker, but when this is made into transform,
+        the unwrap will have to be coded explicitly -->
     <#t>${rawString(Static["com.ilscipio.scipio.ce.webapp.ftl.template.TemplateFtlUtil"].makeElemAttribStr(attribs, includeEmpty, 
       emptyValToken, noValToken, exclude, attribNamePrefix, alwaysAddPrefix, attribNamePrefixStrip, attribNameSubstitutes, camelCaseToDashLowerNames, escapeLang))}<#t>
   <#elseif attribs?is_string>

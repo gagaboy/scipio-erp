@@ -26,7 +26,7 @@
     <!-- LEGACY ECOMMERCE REDIRECT -->
     <rule>
         <from>^/ecommerce([?;#/].*)?$</from>
-        <to type="permanent-redirect" last="true">$1/shop$2</to>
+        <to type="permanent-redirect" last="true">/shop$1?%{query-string}</to>
     </rule>
 
     <!-- SPECIAL REQUEST ATTRIBUTES FOR REWRITE RULES (scpCtrlServPath, etc.) -->
@@ -39,15 +39,17 @@
         uncomment this to get rid of /control/main URLs -->
     <rule>
         <from>^/[^/]+/?([?;#][^/]*)?$</from>
-        <to last="true">%{attribute:scpCtrlServPath}/main$3</to>
+        <to last="true">%{attribute:scpCtrlServPath}/main$1</to>
     </rule>
     <outbound-rule>
-        <from>^([^/]*//[^/]*)?(/[^/]*?)?(/control)?/main([?;#].*)?$</from>
-        <to last="true">$1$2/$4</to>
+        <condition type="context-path">^/.+$</condition>
+        <from>^([^/]*//[^/]*)?(/[^/]+?)(?:/control)?/main(?:(?:/|([?;#]))(.*))?$</from>
+        <to>$1$2/$3$4</to>
     </outbound-rule>
     <outbound-rule>
-        <from>^([^/]*//[^/]*)?(/[^/]*?)?(/control)?/main(/.*)$</from>
-        <to last="true">$1$2$4</to>
+        <condition type="context-path">^$</condition>
+        <from>^([^/]*//[^/]*)?(?:/control)?/main(?:(?:/|([?;#]))(.*))?$</from>
+        <to>$1/$2$3</to>
     </outbound-rule>
 
     <!-- CONTROL-SERVLET-STRIPPING RULES 
@@ -58,6 +60,14 @@
         <to>$1$2$3</to>
     </outbound-rule>
     -->
-     
+
+    <!-- MOUNT-POINT-STRIPPING RULES
+        uncomment if you are stripping the webapp mount-point through a front-end proxy or other
+    <outbound-rule>
+        <from>^([^/]*//[^/]*)?/[^/]+?(?:(?:/|([?;#]))(.*))?$</from>
+        <to>$1/$2$3</to>
+    </outbound-rule>
+    -->
+
 </urlrewrite>
 

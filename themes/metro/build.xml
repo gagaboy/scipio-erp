@@ -27,13 +27,12 @@ under the License.
 
     <property name="desc" value="Metro Theme"/>
     <property name="name" value="metro-theme"/>
-    <property name="ofbiz.home.dir" value="../.."/>
 
     <filelist dir="." id="component.build.dependencies">
         <file name="../base" />
     </filelist>
 
-    <target name="build" depends="check-init-lib-update">
+    <target name="build" depends="check-lib-update">
         <!-- echo message="[build] ========== Building Metro Theme ==========" />
         <echo message="[build] ========== Done Building Metro Theme ==========" /-->
     </target>

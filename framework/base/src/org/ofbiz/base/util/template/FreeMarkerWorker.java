@@ -87,7 +87,7 @@ public class FreeMarkerWorker {
 
     public static final String module = FreeMarkerWorker.class.getName();
 
-    public static final Version version = Configuration.VERSION_2_3_25;
+    public static final Version version = Configuration.VERSION_2_3_27;
 
     // use soft references for this so that things from Content records don't kill all of our memory, or maybe not for performance reasons... hmmm, leave to config file...
     private static final UtilCache<String, Template> cachedTemplates = UtilCache.createUtilCache("template.ftl.general", 0, 0, false);
@@ -154,8 +154,12 @@ public class FreeMarkerWorker {
         return defaultSimpleTypeCopyingWrapper;
     }
 
+    public static Configuration newConfiguration() {
+        return new Configuration(version);
+    }
+
     public static Configuration makeConfiguration(BeansWrapper wrapper) {
-        Configuration newConfig = new Configuration(version);
+        Configuration newConfig = newConfiguration();
 
         newConfig.setObjectWrapper(wrapper);
         TemplateHashModel staticModels = wrapper.getStaticModels();

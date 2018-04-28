@@ -105,7 +105,7 @@
 
 <@section title="Image container">
     <@row>
-        <@cell columns=4><@img src="https://placehold.it/240x800" type="cover" link="#" height="100px" width="100%" />Cover</@cell>
+        <@cell columns=4><@img src="https://placehold.it/240x800" id="test" type="cover" link="#" height="100px" width="100%" />Cover</@cell>
         <@cell columns=4><@img src="https://placehold.it/240x800" type="contain" link="#" height="100px" width="100%" />Contain</@cell>
         <@cell columns=4><@img src="https://placehold.it/240x800" type="none" link="#" height="100px" width="100%" />Automatically adjusted</@cell>
     </@row>    
@@ -554,14 +554,14 @@
 <@section title="Tabs">
     <@row>
         <@cell columns="6">
-            <@tabs type="vertical" title="Horizontal">
+            <@tabs type="vertical" title="Vertical">
                 <@tab title="Tab 1">Logic is the beginning of wisdom, not the end.</@tab>
                 <@tab title="Tab 2">"Do not grieve, Admiral. It was logical. The needs of the many outweigh 'The needs of the few.'", Spock grimaces, nods. "Or the one"</@tab>
                 <@tab title="Tab 3">Do you know the old Klingon proverb that revenge is a dish best served cold? It is very cold - in space</@tab>
             </@tabs>
         </@cell>
         <@cell columns="6">
-            <@tabs type="horizontal" title="Vertical">
+            <@tabs type="horizontal" title="Horizontal">
                 <@tab title="Tab 1">Logic is the beginning of wisdom, not the end.</@tab>
                 <@tab title="Tab 2">"Do not grieve, Admiral. It was logical. The needs of the many outweigh 'The needs of the few.'", Spock grimaces, nods. "Or the one"</@tab>
                 <@tab title="Tab 3">Do you know the old Klingon proverb that revenge is a dish best served cold? It is very cold - in space</@tab>
@@ -627,7 +627,7 @@
       <@field type="input" name="input3nolabel" />
       <@field type="email" name="input3a" label="Input 3a - Email"/>
       <@field type="password" name="input3b" label="Input 3b - Password"/>
-      <@field type="number" name="input3c" label="Input 3c - Number"/>
+      <@field type="number" name="input3c" label="Input 3c - Number" value="4"/>
       <@field type="file" name="input3d" label="Input 3d - File"/>
       <@field type="url" name="input3e" label="Input 3e - Url"/>
       <@field type="color" name="input3f" label="Input 3f - Color"/>
@@ -1125,6 +1125,86 @@
         </@fields>
       </@fields>
     </@form>
+  </@section>
+  </#if>
+  
+  <#if debugMode>
+  <@section title="@field custom attributes (attribs={})">
+    <@form name="form-attribs">
+      <#assign fieldAttribs = {"my-attrib-1":"test-value-1", "myattrib2":"testvalue2"}>
+      <@field type="input" name="input1" label="Input" attribs=fieldAttribs/>
+      <@field type="display" name="input2" label="Display" attribs=fieldAttribs>Test</@field>
+      <@field type="textarea" name="input3" label="Textarea" attribs=fieldAttribs/>
+      <@field type="datetime" name="input4" label="Datetime" attribs=fieldAttribs/>
+      <@field type="select" name="input5" label="Select" attribs=fieldAttribs items=[
+        {"key":"val1", "description":"option1", "attribs":fieldAttribs}]>
+        <@field type="option" value="sdfsdf" attribs=fieldAttribs/>
+      </@field>
+      <@field type="checkbox" name="input6a" label="Checkbox" attribs=fieldAttribs/>
+      <#-- NOTE: here the fieldAttribs are blended with the item-specific attribs -->
+      <@field type="checkbox" name="input6b" label="Checkbox" attribs=fieldAttribs items=[
+        {"value":"val1", "description":"option1", "attribs":{"my-extra-3":"value-3"}},
+        {"value":"val2", "description":"option2", "attribs":{"my-extra-4":"value-4"}}]/>
+      <@field type="radio" name="input7a" label="Radio" attribs=fieldAttribs/>
+      <#-- NOTE: here the fieldAttribs are blended with the item-specific attribs -->
+      <@field type="radio" name="input7b" label="Radio" attribs=fieldAttribs items=[
+        {"value":"val1", "description":"option1", "attribs":{"my-extra-3":"value-3"}},
+        {"value":"val2", "description":"option2", "attribs":{"my-extra-4":"value-4"}}]/>
+      <@field type="submit" name="input8a" label="Submit" attribs=fieldAttribs/>
+      <@field type="submit" submitType="link" name="input8b" label="Submit" attribs=fieldAttribs/>
+      <@field type="submit" submitType="image" name="input8c" label="Submit" attribs=fieldAttribs/>
+      <@field type="reset" name="input9" label="Reset" attribs=fieldAttribs/>
+      <@field type="hidden" name="input10" attribs=fieldAttribs/>
+      <@field type="textfind" name="input11" label="Textfind" attribs=fieldAttribs/>
+      <@field type="datefind" name="input12" label="Datefind" attribs=fieldAttribs/>
+      <@field type="rangefind" name="input13" label="Rangefind" attribs=fieldAttribs/>
+      <@field type="lookup" name="input14" label="Lookup" attribs=fieldAttribs fieldFormName="LookupGeo"/>
+      <@field type="file" name="input15" label="File" attribs=fieldAttribs/>
+      <@field type="password" name="input16" label="Password" attribs=fieldAttribs/>
+      <@field type="color" name="input17" label="Color" attribs=fieldAttribs/>
+    </@form>
+  </@section>
+  
+  <@section title="tooltips">
+    <@section title="@field tooltips">
+      <@form name="form-tooltips">
+        <#assign fieldTooltip = "This is a tooltip!">
+        <@field type="input" name="input1" label="Input" tooltip=fieldTooltip/>
+        <@field type="display" name="input2" label="Display" tooltip=fieldTooltip>Test</@field>
+        <@field type="textarea" name="input3" label="Textarea" tooltip=fieldTooltip/>
+        <@field type="datetime" name="input4" label="Datetime" tooltip=fieldTooltip/>
+        <@field type="select" name="input5" label="Select" tooltip=fieldTooltip items=[
+          {"key":"val1", "description":"option1", "attribs":fieldAttribs}]>
+          <@field type="option" value="sdfsdf" tooltip=fieldTooltip/>
+        </@field>
+        <@field type="checkbox" name="input6a" label="Checkbox" tooltip=fieldTooltip/>
+        <#-- NOTE: here the fieldAttribs are blended with the item-specific attribs -->
+        <@field type="checkbox" name="input6b" label="Checkbox" tooltip=fieldTooltip items=[
+          {"value":"val1", "description":"option1", "attribs":{"my-extra-3":"value-3"}},
+          {"value":"val2", "description":"option2", "attribs":{"my-extra-4":"value-4"}}]/>
+        <@field type="radio" name="input7a" label="Radio" tooltip=fieldTooltip/>
+        <#-- NOTE: here the fieldAttribs are blended with the item-specific attribs -->
+        <@field type="radio" name="input7b" label="Radio" tooltip=fieldTooltip items=[
+          {"value":"val1", "description":"option1", "attribs":{"my-extra-3":"value-3"}},
+          {"value":"val2", "description":"option2", "attribs":{"my-extra-4":"value-4"}}]/>
+        <@field type="submit" name="input8a" label="Submit" tooltip=fieldTooltip/>
+        <@field type="submit" submitType="link" name="input8b" label="Submit" tooltip=fieldTooltip/>
+        <@field type="submit" submitType="image" name="input8c" label="Submit" tooltip=fieldTooltip/>
+        <@field type="reset" name="input9" label="Reset" tooltip=fieldTooltip/>
+        <@field type="hidden" name="input10" tooltip=fieldTooltip/>
+        <@field type="textfind" name="input11" label="Textfind" tooltip=fieldTooltip/>
+        <@field type="datefind" name="input12" label="Datefind" tooltip=fieldTooltip/>
+        <@field type="rangefind" name="input13" label="Rangefind" tooltip=fieldTooltip/>
+        <@field type="lookup" name="input14" label="Lookup" tooltip=fieldTooltip fieldFormName="LookupGeo"/>
+        <@field type="file" name="input15" label="File" tooltip=fieldTooltip/>
+        <@field type="password" name="input16" label="Password" tooltip=fieldTooltip/>
+        <@field type="color" name="input17" label="Color" tooltip=fieldTooltip/>
+      </@form>
+    </@section>
+    
+    <@section title="Form widget tooltips">
+      <@render type="form" resource="component://webtools/widget/MiscForms.xml#TooltipTestForm1"/>
+    </@section>
   </@section>
   </#if>
 </@section>
@@ -2024,6 +2104,13 @@
             </ul>     
         </li>
       </ul>
+  </@section>
+  <@section title="Message/description escaping (escapeMsg, escapeEventMsg)">
+    <ul>
+      <li>${escapeMsg("this is a\nmessage with line\nbreaks and special chars <><>''", 'htmlmarkup')}</li>
+      <li>${escapeMsg("this is a\nmessage with line\nbreaks ignored and special chars <><>''", 'htmlmarkup', {"interpret":false})}</li>
+      <li>${escapeEventMsg(rewrapString("this is an event\nmessage with line\nbreaks and special chars <><>''"), 'htmlmarkup')}</li>
+    </ul>
   </@section>
 </@section>
 

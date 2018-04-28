@@ -18,6 +18,7 @@ import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrRequest.METHOD;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.response.FacetField;
 import org.apache.solr.client.solrj.response.FacetField.Count;
 import org.apache.solr.client.solrj.response.QueryResponse;
@@ -52,6 +53,8 @@ public abstract class SolrProductSearch {
 
     private static final boolean rebuildClearAndUseCacheDefault = UtilProperties.getPropertyAsBoolean(SolrUtil.solrConfigName, 
             "solr.index.rebuild.clearAndUseCache", false);
+    private static final String defaultRegisterUpdateToSolrUpdateSrv = UtilProperties.getPropertyValue(SolrUtil.solrConfigName, 
+            "solr.service.registerUpdateToSolr.updateSrv", "updateToSolr");
     
     static final boolean excludeVariantsDefault = true;
     
@@ -97,7 +100,7 @@ public abstract class SolrProductSearch {
         // NOTE: log this as info because it's the only log line
         Debug.logInfo("Solr: removeFromSolr: Removing productId '" + productId + "' from index", module);
         try {
-            HttpSolrClient client = SolrUtil.getHttpSolrClient((String) context.get("core"));
+            HttpSolrClient client = SolrUtil.getUpdateHttpSolrClient((String) context.get("core"));
             client.deleteByQuery("productId:" + SolrExprUtil.escapeTermFull(productId));
             client.commit();
             result = ServiceUtil.returnSuccess();
@@ -123,6 +126,11 @@ public abstract class SolrProductSearch {
         return updateToSolrCommon(dctx, context, updateToSolrActionMap.get(context.get("action")), false);
     }
     
+    /**
+     * Core implementation for the updateToSolr, addToSolr, removeFromSolr, and registerUpdateToSolr services.
+     * <p>
+     * Upon error, unless instructed otherwise, this marks the Solr data as dirty.
+     */
     private static Map<String, Object> updateToSolrCommon(DispatchContext dctx, Map<String, Object> context, Boolean forceAdd, boolean immediate) {
         Map<String, Object> result;
 
@@ -142,7 +150,7 @@ public abstract class SolrProductSearch {
                 Map<String, Object> productInst = (Map<String, Object>) context.get("instance");
                 if (productInst != null) productId = (String) productInst.get("productId");
                 else productId = (String) context.get("productId");
-                if (productId == null) ServiceUtil.returnError("missing product instance or productId");
+                if (productId == null) return ServiceUtil.returnError("missing product instance or productId");
 
                 if (immediate) {
                     result = updateToSolrCore(dctx, context, forceAdd, productId, productInst);
@@ -244,22 +252,24 @@ public abstract class SolrProductSearch {
      * but should cover the ones we're using.
      */
     private static Map<String, Object> registerUpdateToSolrForTxCore(DispatchContext dctx, Map<String, Object> context, Boolean forceAdd, String productId, Map<String, Object> productInst) {
+        String updateSrv = (String) context.get("updateSrv");
+        if (updateSrv == null) updateSrv = defaultRegisterUpdateToSolrUpdateSrv;
         try {
             LocalDispatcher dispatcher = dctx.getDispatcher();
             ServiceSyncRegistrations regs = dispatcher.getServiceSyncRegistrations();
 
             List<ServiceSyncRegistration> unregList = null;
-            for(ServiceSyncRegistration reg : regs.getCommitRegistrationsForService("updateToSolr")) {
+            for(ServiceSyncRegistration reg : regs.getCommitRegistrationsForService(updateSrv)) {
                 Map<String, ?> regServCtx = reg.getContext();
                 if (productId.equals(regServCtx.get("productId"))) {
                     Boolean regServAction = updateToSolrActionMap.get(regServCtx.get("action"));
                     if (regServAction == null) {
                         // already registered
-                        return ServiceUtil.returnSuccess("updateToSolr already registered to run at transaction global-commit for productId '" + productId + ")");
+                        return ServiceUtil.returnSuccess(updateSrv + " already registered to run at transaction global-commit for productId '" + productId + ")");
                     } else {
                         if (regServAction == forceAdd) {
                             // already registered
-                            return ServiceUtil.returnSuccess("updateToSolr already registered to run at transaction global-commit for productId '" + productId + ")");
+                            return ServiceUtil.returnSuccess(updateSrv + " already registered to run at transaction global-commit for productId '" + productId + ")");
                         } else {
                             // we will have to unregister
                             if (unregList == null) unregList = new ArrayList<>();
@@ -275,17 +285,17 @@ public abstract class SolrProductSearch {
             }
             
             // register the service
-            Map<String, Object> servCtx = dctx.makeValidContext("updateToSolr", ModelService.IN_PARAM, context);
+            Map<String, Object> servCtx = dctx.makeValidContext(updateSrv, ModelService.IN_PARAM, context);
             // IMPORTANT: DO NOT PASS AN INSTANCE; use productId to force updateToSolr to re-query the Product
             // after transaction committed
             servCtx.remove("instance");
             servCtx.put("productId", productId);
             servCtx.put("action", getUpdateToSolrAction(forceAdd));
-            regs.addCommitService(dctx, "updateToSolr", null, servCtx, false, false);
+            regs.addCommitService(dctx, updateSrv, null, servCtx, false, false);
             
-            return ServiceUtil.returnSuccess("Registered updateToSolr to run at transaction global-commit for productId '" + productId + ")");
+            return ServiceUtil.returnSuccess("Registered " + updateSrv + " to run at transaction global-commit for productId '" + productId + ")");
         } catch (Exception e) {
-            final String errMsg = "Could not register updateToSolr to run at transaction global-commit for product '" + productId + "'";
+            final String errMsg = "Could not register " + updateSrv + " to run at transaction global-commit for product '" + productId + "'";
             Debug.logError(e, "Solr: registerUpdateToSolr: " + productId, module);
             return ServiceUtil.returnError(errMsg);
         }
@@ -306,7 +316,7 @@ public abstract class SolrProductSearch {
         try {
             Debug.logInfo("Solr: Generating and indexing document for productId '" + productId + "'", module);
 
-            client = SolrUtil.getHttpSolrClient((String) context.get("core"));
+            client = SolrUtil.getUpdateHttpSolrClient((String) context.get("core"));
             // Debug.log(server.ping().toString());
 
             // Construct Documents
@@ -388,7 +398,7 @@ public abstract class SolrProductSearch {
                     docs.add(doc1);
                 }
                 // push Documents to server
-                client = SolrUtil.getHttpSolrClient((String) context.get("core"));
+                client = SolrUtil.getUpdateHttpSolrClient((String) context.get("core"));
                 client.add(docs);
                 client.commit();
             }
@@ -452,7 +462,7 @@ public abstract class SolrProductSearch {
             // the passed values may not be simple fields names, they require complex expressions containing spaces and special chars
             // (for example the old "queryFilter" parameter was unusable, so now have "queryFilters" list in addition).
             
-            client = SolrUtil.getHttpSolrClient((String) context.get("core"));
+            client = SolrUtil.getQueryHttpSolrClient((String) context.get("core"));
             // create Query Object
             SolrQuery solrQuery = new SolrQuery();
             solrQuery.setQuery((String) context.get("query"));
@@ -622,8 +632,17 @@ public abstract class SolrProductSearch {
             if ((String) context.get("facetQuery") != null) {
                 solrQuery.addFacetQuery((String) context.get("facetQuery"));
             }
-
-            QueryResponse rsp = client.query(solrQuery, METHOD.POST);
+         
+            //QueryResponse rsp = client.query(solrQuery, METHOD.POST); // old way (can't configure the request)
+            QueryRequest req = new QueryRequest(solrQuery, METHOD.POST);
+            String solrUsername = (String) context.get("solrUsername");
+            if (solrUsername != null) {
+                String solrPassword = (String) context.get("solrPassword");
+                // This will override the credentials stored in (Scipio)HttpSolrClient, if any
+                req.setBasicAuthCredentials(solrUsername, solrPassword);
+            }
+            QueryResponse rsp = req.process(client);
+            
             result = ServiceUtil.returnSuccess();
             result.put("queryResult", rsp);
         } catch (Exception e) {
@@ -997,11 +1016,11 @@ public abstract class SolrProductSearch {
         LocalDispatcher dispatcher = dctx.getDispatcher();
         //GenericValue userLogin = (GenericValue) context.get("userLogin");
         //Locale locale = new Locale("de_DE");
-
+        
         // 2016-03-29: Only if dirty (or unknown)
         Boolean onlyIfDirty = (Boolean) context.get("onlyIfDirty");
         if (onlyIfDirty == null) onlyIfDirty = false;
-        // 2017-08-23: Only if solr.config.version changed
+        // 2017-08-23: Only if effective Solr config version changed
         Boolean ifConfigChange = (Boolean) context.get("ifConfigChange");
         if (ifConfigChange == null) ifConfigChange = false;
         if (onlyIfDirty || ifConfigChange) {
@@ -1052,9 +1071,23 @@ public abstract class SolrProductSearch {
         int numDocs = 0;
         int numDocsIndexed = 0; // 2018-02: needed for accurate stats in case a client edit filters out products within loop
         EntityListIterator prodIt = null;
+        boolean executed = false;
         try {
+            client = SolrUtil.getUpdateHttpSolrClient((String) context.get("core"));
+            
+            // 2018-02-20: new ability to wait for Solr to load
+            if (Boolean.TRUE.equals(context.get("waitSolrReady"))) {
+                // NOTE: skipping runSync for speed; we know the implementation...
+                Map<String, Object> waitCtx = new HashMap<>();
+                waitCtx.put("client", client);
+                Map<String, Object> waitResult = waitSolrReady(dctx, waitCtx); // params will be null
+                if (!ServiceUtil.isSuccess(waitResult)) {
+                    throw new ScipioSolrException(ServiceUtil.getErrorMessage(waitResult)).setLightweight(true);
+                }
+            }
+            
+            executed = true;
             Debug.logInfo("Solr: rebuildSolrIndex: Clearing solr index", module);
-            client = SolrUtil.getHttpSolrClient((String) context.get("core"));
             // this removes everything from the index
             client.deleteByQuery("*:*");
             client.commit();
@@ -1151,7 +1184,12 @@ public abstract class SolrProductSearch {
                 result = ServiceUtil.returnError(e.toString());
             }
         } catch (Exception e) {
-            Debug.logError(e, "Solr: rebuildSolrIndex: Error: " + e.getMessage(), module);
+            if (e instanceof ScipioSolrException && ((ScipioSolrException) e).isLightweight()) {
+                // don't print the error itself, too verbose
+                Debug.logError("Solr: rebuildSolrIndex: Error: " + e.getMessage(), module);
+            } else {
+                Debug.logError(e, "Solr: rebuildSolrIndex: Error: " + e.getMessage(), module);
+            }
             result = ServiceUtil.returnError(e.toString());
         } finally {
             if (prodIt != null) {
@@ -1166,7 +1204,7 @@ public abstract class SolrProductSearch {
         }
         
         // If success, mark data as good
-        if (ServiceUtil.isSuccess(result)) {
+        if (result != null && ServiceUtil.isSuccess(result)) {
             // TODO?: REVIEW?: 2018-01-03: for this method, for now, unlike updateToSolr,
             // we will leave the status update in the same transaction as parent service,
             // because it is technically possible that there was an error in the parent transaction
@@ -1180,7 +1218,7 @@ public abstract class SolrProductSearch {
             SolrUtil.setSolrDataStatusIdSafe(delegator, "SOLR_DATA_OK", true);
         }   
         result.put("numDocs", numDocs);
-        result.put("executed", Boolean.TRUE);
+        result.put("executed", executed);
         
         return result;
     }
@@ -1232,6 +1270,11 @@ public abstract class SolrProductSearch {
                 ifConfigChange = false;
             }
             
+            Boolean waitSolrReady = (Boolean) context.get("waitSolrReady");
+            if (waitSolrReady == null) {
+                waitSolrReady = UtilProperties.getPropertyAsBoolean(SolrUtil.solrConfigName, "solr.index.rebuild.autoRun.waitSolrReady", true);
+            }
+            
             Debug.logInfo("Solr: rebuildSolrIndexAuto: Launching index check/rebuild (onlyIfDirty: " + onlyIfDirty + ", ifConfigChange: " + ifConfigChange + ")", module);
 
             Map<String, Object> servCtx;
@@ -1240,6 +1283,7 @@ public abstract class SolrProductSearch {
                 
                 servCtx.put("onlyIfDirty", onlyIfDirty);
                 servCtx.put("ifConfigChange", ifConfigChange);
+                servCtx.put("waitSolrReady", waitSolrReady);
                 
                 Map<String, Object> servResult = dispatcher.runSync("rebuildSolrIndex", servCtx);
                 
@@ -1300,5 +1344,75 @@ public abstract class SolrProductSearch {
         for(String fieldName : fieldNames) {
             if (!destCtx.containsKey(fieldName)) destCtx.put(fieldName, srcCtx.get(fieldName));
         }
+    }
+    
+    public static Map<String, Object> checkSolrReady(DispatchContext dctx, Map<String, Object> context) {
+        Map<String, Object> result = ServiceUtil.returnSuccess();
+        boolean enabled = SolrUtil.isSolrWebappEnabled();
+        result.put("enabled", enabled);
+        try {
+            HttpSolrClient client = (HttpSolrClient) context.get("client");
+            if (client == null) client = SolrUtil.getQueryHttpSolrClient((String) context.get("core"));
+            result.put("ready", SolrUtil.isSolrWebappReady(client));
+        } catch (Exception e) {
+            Debug.logWarning(e, "Solr: checkSolrReady: error trying to check if Solr ready: " + e.getMessage(), module);
+            result = ServiceUtil.returnFailure("Error while checking if Solr ready");
+            result.put("enabled", enabled);
+            result.put("ready", false);
+            return result;
+        }
+        return result;
+    }
+    
+    public static Map<String, Object> waitSolrReady(DispatchContext dctx, Map<String, Object> context) {
+        if (!SolrUtil.isSolrWebappEnabled()) {
+            return ServiceUtil.returnFailure("Solr webapp not enabled");
+        }
+        HttpSolrClient client = null;
+        try {
+            client = (HttpSolrClient) context.get("client");
+            if (client == null) client = SolrUtil.getQueryHttpSolrClient((String) context.get("core"));
+            
+            if (SolrUtil.isSolrWebappReady(client)) {
+                if (Debug.verboseOn()) Debug.logInfo("Solr: waitSolrReady: Solr is ready, continuing", module);
+                return ServiceUtil.returnSuccess();
+            }
+        } catch (Exception e) {
+            Debug.logWarning(e, "Solr: waitSolrReady: error trying to check if Solr ready: " + e.getMessage(), module);
+            return ServiceUtil.returnFailure("Error while checking if Solr ready");
+        }
+        
+        Integer maxChecks = (Integer) context.get("maxChecks");
+        if (maxChecks == null) maxChecks = UtilProperties.getPropertyAsInteger(SolrUtil.solrConfigName, "solr.service.waitSolrReady.maxChecks", null);
+        if (maxChecks != null && maxChecks < 0) maxChecks = null;
+        
+        Integer sleepTime = (Integer) context.get("sleepTime");
+        if (sleepTime == null) sleepTime = UtilProperties.getPropertyAsInteger(SolrUtil.solrConfigName, "solr.service.waitSolrReady.sleepTime", null);
+        if (sleepTime == null || sleepTime < 0) sleepTime = 3000;
+        
+        int checkNum = 2; // first already done above
+        while((maxChecks == null || checkNum <= maxChecks)) {
+            Debug.logInfo("Solr: waitSolrReady: Solr not ready, waiting " + sleepTime + "ms (check " + checkNum + (maxChecks != null ? "/" + maxChecks : "") + ")", module);
+            
+            try {
+                Thread.sleep(sleepTime);
+            } catch (Exception e) {
+                Debug.logWarning("Solr: waitSolrReady: interrupted while waiting for Solr: " + e.getMessage(), module);
+                return ServiceUtil.returnFailure("Solr not ready, interrupted while waiting");
+            }
+            
+            try {
+                if (SolrUtil.isSolrWebappReady(client)) {
+                    Debug.logInfo("Solr: waitSolrReady: Solr is ready, continuing", module);
+                    return ServiceUtil.returnSuccess();
+                }
+            } catch (Exception e) {
+                Debug.logWarning(e, "Solr: waitSolrReady: error trying to check if Solr ready: " + e.getMessage(), module);
+                return ServiceUtil.returnFailure("Error while checking if Solr ready");
+            }
+            checkNum++;
+        }
+        
+        return ServiceUtil.returnFailure("Solr not ready, reached max wait time");
     }
 }
